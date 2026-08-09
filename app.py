@@ -1,45 +1,73 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
+import requests
 import pandas as pd
 import datetime
-import os
 import io
 
-# -------------------------- 文件配置 --------------------------
-DATA_FILE = "student_records.csv"
-STUDENT_DB = "students_database.csv"
+# -------------------------- 1. 安全配置 (从 Secrets 读取) --------------------------
+# 请确保在 Streamlit Cloud 的 Settings -> Secrets 中已填好这些 ID
+APP_ID = st.secrets["FEISHU_APP_ID"]
+APP_SECRET = st.secrets["FEISHU_APP_SECRET"]
+APP_TOKEN = st.secrets["FEISHU_APP_TOKEN"]
+TABLE_ID_STUDENTS = st.secrets["TABLE_ID_STUDENTS"]
+TABLE_ID_RECORDS = st.secrets["TABLE_ID_RECORDS"]
 
+# -------------------------- 2. 基础业务配置 --------------------------
 REVIEW_DAYS = [1, 2, 3, 5, 7, 9, 12, 14, 17, 21]
-LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初中阅读", "初中语法", "高中阅读", "长难句"]
+LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初中阅读", "初中语法", "高中阅读", "高中完型", "长难句"]
 HOURS_OPTIONS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
 STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业"]
 
-# 初始化文件
-def init_files():
-    if not os.path.exists(DATA_FILE):
-        pd.DataFrame(columns=["姓名", "学习日期", "学习内容", "课时"]).to_csv(DATA_FILE, index=False, encoding="utf-8-sig")
-    if not os.path.exists(STUDENT_DB):
-        pd.DataFrame(columns=["姓名", "状态", "备注"]).to_csv(STUDENT_DB, index=False, encoding="utf-8-sig")
+# -------------------------- 3. 飞书 API 工具函数 --------------------------
 
-init_files()
+def get_tenant_access_token():
+    """获取飞书授权令牌"""
+    url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+    headers = {"Content-Type": "application/json; charset=utf-8"}
+    payload = {"app_id": APP_ID, "app_secret": APP_SECRET}
+    try:
+        r = requests.post(url, headers=headers, json=payload)
+        return r.json().get("tenant_access_token")
+    except:
+        return None
 
-# -------------------------- 工具函数 --------------------------
-def load_records():
-    return pd.read_csv(DATA_FILE, encoding="utf-8-sig")
-
-def load_students():
-    return pd.read_csv(STUDENT_DB, encoding="utf-8-sig")
-
-def save_students(df):
-    df.to_csv(STUDENT_DB, index=False, encoding="utf-8-sig")
-
-# 生成微信文案
-def generate_wechat_msg(name, review_date, learn_dates):
-    rv_date_str = review_date.strftime("%m月%d日")
-    sorted_learn_dates = sorted(list(set(learn_dates)))
-    ln_dates_str = "\n".join([datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%m月%d日学习内容") for d in sorted_learn_dates])
+def fetch_feishu_data(table_id):
+    """从飞书读取数据"""
+    token = get_tenant_access_token()
+    if not token: return pd.DataFrame()
     
-    msg = f"""【21天抗遗忘复习提醒】
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records?page_size=500"
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        r = requests.get(url, headers=headers)
+        items = r.json().get("data", {}).get("items", [])
+        if not items: return pd.DataFrame()
+        
+        data = []
+        for item in items:
+            fields = item["fields"]
+            data.append(fields)
+        return pd.DataFrame(data)
+    except:
+        return pd.DataFrame()
+
+def add_feishu_record(table_id, fields):
+    """向飞书写入一条记录"""
+    token = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {"fields": fields}
+    r = requests.post(url, headers=headers, json=payload)
+    return r.json()
+
+def generate_wechat_msg(name, review_date, learn_dates):
+    """生成符合老师要求的微信复制文案"""
+    rv_date_str = review_date.strftime("%m月%d日")
+    sorted_ln = sorted(list(set(learn_dates)))
+    ln_dates_str = "\n".join([datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%m月%d日学习内容") for d in sorted_ln])
+    
+    return f"""【21天抗遗忘复习提醒】
 
 {rv_date_str}复习内容为：
 
@@ -48,144 +76,139 @@ def generate_wechat_msg(name, review_date, learn_dates):
 请{name}同学抽出时间复习 巩固单词印象 加油哦💪期待下次的课堂哦[加油][加油][加油]
 
 也请家长把复习视频发到群里🌹"""
-    return msg
 
-# -------------------------- 界面配置 (自适应优化) --------------------------
-st.set_page_config(
-    page_title="21天抗遗忘系统", 
-    layout="centered", # 手机端居中显示更美观
-    page_icon="🎯"
-)
+# -------------------------- 4. 界面布局 (手机端优化) --------------------------
 
-# 手机端样式微调
+st.set_page_config(page_title="21天抗遗忘系统", layout="centered", page_icon="🎯")
+
+# 针对手机端增大按钮和文字
 st.markdown("""
     <style>
-    /* 让按钮更大，方便手指点击 */
-    .stButton > button {
-        width: 100%;
-        height: 3.5em;
-    }
-    /* 调整代码块字体，方便手机阅读 */
-    code {
-        font-size: 16px !important;
-    }
+    .stButton > button { width: 100%; height: 3.5em; font-size: 18px !important; }
+    .stSelectbox label, .stDateInput label { font-size: 18px !important; font-weight: bold; }
+    code { font-size: 16px !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 顶部提醒 ---
-r_df_check = load_records()
-r_df_check['学习日期'] = pd.to_datetime(r_df_check['学习日期']).dt.date
+# --- 顶部每日代办红框提醒 ---
 today = datetime.date.today()
-today_tasks_count = 0
-for _, row in r_df_check.iterrows():
-    if (today - row['学习日期']).days + 1 in REVIEW_DAYS:
-        today_tasks_count += 1
+# 这里为了性能，只在进入复习提醒模块时查询，或在此处做一个简易检测
+st.sidebar.caption(f"当前日期: {today}")
 
-if today_tasks_count > 0:
-    st.error(f"🚨 **今日代办**：有 {today_tasks_count} 条复习任务待处理！")
+# --- 功能导航 (下拉菜单最适合手机) ---
+menu = st.selectbox("📌 请选择功能模块", ["🔍 复习提醒查询", "📝 录入课时记录", "👤 学生库管理", "📊 历史数据总表", "📄 导出21天表"])
 
-# --- 下拉菜单导航 ---
-menu = st.selectbox("📌 切换功能模块", ["🔍 复习提醒查询", "📝 录入课时记录", "👤 学生名单管理", "📄 导出21天记录表", "📊 历史记录总表"])
+# -------------------------- 5. 各模块功能逻辑 --------------------------
 
-# -------------------------- 1. 复习提醒查询 (自适应+一键复制) --------------------------
+# --- 模块 1：复习提醒 ---
 if menu == "🔍 复习提醒查询":
     st.subheader("🔍 复习提醒查询")
-    q_date = st.date_input("选择日期", datetime.date.today())
+    q_date = st.date_input("选择查询日期", today)
     
-    r_df = load_records()
-    r_df['学习日期'] = pd.to_datetime(r_df['学习日期']).dt.date
+    with st.spinner('正在同步飞书云端任务...'):
+        r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     
-    student_reminders = {}
-    for _, row in r_df.iterrows():
-        diff = (q_date - row['学习日期']).days + 1
-        if diff in REVIEW_DAYS:
-            name = row['姓名']
-            if name not in student_reminders:
-                student_reminders[name] = []
-            student_reminders[name].append(row['学习日期'].strftime("%Y-%m-%d"))
-            
-    if student_reminders:
-        st.success(f"📅 共找到 {len(student_reminders)} 位同学")
-        for name, l_dates in student_reminders.items():
-            # 手机端卡片布局
-            with st.container():
-                st.markdown(f"👤 **学生：{name}**")
-                final_msg = generate_wechat_msg(name, q_date, l_dates)
-                
-                # 使用 st.code 实现一键复制。右上角会自动出现复制图标
-                st.code(final_msg, language=None)
-                st.info("👆 点击框框右上角小图标即可复制文案")
-                st.divider()
+    if not r_df.empty and "学习日期" in r_df.columns:
+        # 将飞书日期列转换为日期对象
+        r_df['学习日期_dt'] = pd.to_datetime(r_df['学习日期']).dt.date
+        reminders = {}
+        
+        for _, row in r_df.iterrows():
+            # 计算天数差：查询日期 - 学习日期 + 1
+            diff = (q_date - row['学习日期_dt']).days + 1
+            if diff in REVIEW_DAYS:
+                name = row['姓名']
+                if name not in reminders: reminders[name] = []
+                reminders[name].append(row['学习日期'])
+        
+        if reminders:
+            st.error(f"🚨 今日共有 {len(reminders)} 位同学需复习")
+            for name, dates in reminders.items():
+                with st.container(border=True):
+                    st.markdown(f"👤 **学员姓名：{name}**")
+                    msg = generate_wechat_msg(name, q_date, dates)
+                    # 使用 st.code 自带一键复制图标
+                    st.code(msg, language=None)
+                    st.caption("✨ 点击右上角图标一键复制文案")
+        else:
+            st.info("💡 该日期暂无复习任务")
     else:
-        st.info("💡 该日期暂无复习任务")
+        st.info("💡 云端尚无课时记录，请先录入。")
 
-# -------------------------- 2. 录入课时记录 --------------------------
+# --- 模块 2：录入课时 ---
 elif menu == "📝 录入课时记录":
     st.subheader("📝 课时录入")
-    s_df = load_students()
-    active_students = s_df[s_df['状态'] == "在读/上课"]['姓名'].tolist()
+    s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
+    active_students = []
+    if not s_df.empty and "状态" in s_df.columns:
+        active_students = s_df[s_df['状态'] == "在读/上课"]['姓名'].tolist()
     
     if not active_students:
-        st.warning("请先去管理后台添加学员")
+        st.warning("⚠️ 库中没有在读学员，请先去'学生库管理'添加。")
     else:
-        with st.form("input_form"):
-            name = st.selectbox("👤 学生姓名", active_students)
-            date = st.date_input("📅 学习日期", datetime.date.today())
+        with st.form("lesson_form"):
+            name = st.selectbox("👤 选择学生", active_students)
+            date = st.date_input("📅 学习日期", today)
             content = st.selectbox("📚 学习内容", LEARN_CONTENTS)
-            hour = st.select_slider("⏰ 课时", options=HOURS_OPTIONS, value=1.0)
-            if st.form_submit_button("💾 保存记录"):
-                r_df = load_records()
-                new_rec = pd.DataFrame([[name, date.strftime("%Y-%m-%d"), content, hour]], columns=r_df.columns)
-                pd.concat([r_df, new_rec], ignore_index=True).to_csv(DATA_FILE, index=False, encoding="utf-8-sig")
-                st.success(f"已保存 {name} 的记录")
-                st.rerun()
+            hour = st.select_slider("⏰ 课时数", options=HOURS_OPTIONS, value=1.0)
+            
+            if st.form_submit_button("💾 保存并同步到飞书"):
+                fields = {
+                    "姓名": name,
+                    "学习日期": date.strftime("%Y-%m-%d"),
+                    "学习内容": content,
+                    "课时": hour
+                }
+                res = add_feishu_record(TABLE_ID_RECORDS, fields)
+                st.success(f"✅ 已存入飞书云端！学员：{name}")
+                st.balloons()
 
-# -------------------------- 3. 学生名单管理 --------------------------
-elif menu == "👤 学生名单管理":
-    st.subheader("👥 学生库管理")
+# --- 模块 3：学生库管理 ---
+elif menu == "👤 学生库管理":
+    st.subheader("👥 学员信息库")
     with st.expander("➕ 添加新学员"):
-        with st.form("add_form"):
-            new_name = st.text_input("姓名")
-            new_status = st.selectbox("状态", STATUS_OPTIONS)
-            if st.form_submit_button("添加"):
-                s_df = load_students()
-                new_row = pd.DataFrame([[new_name, new_status, ""]], columns=s_df.columns)
-                save_students(pd.concat([s_df, new_row], ignore_index=True))
-                st.success("添加成功")
-                st.rerun()
+        with st.form("student_form"):
+            n_name = st.text_input("学生姓名")
+            n_status = st.selectbox("初始状态", STATUS_OPTIONS)
+            if st.form_submit_button("确认入库"):
+                if n_name:
+                    add_feishu_record(TABLE_ID_STUDENTS, {"姓名": n_name, "状态": n_status})
+                    st.success(f"✅ {n_name} 已成功加入云端名册")
+                    st.rerun()
 
-    s_df = load_students()
-    if not s_df.empty:
-        st.markdown("👇 可直接修改表格并保存")
-        edited_df = st.data_editor(s_df, use_container_width=True)
-        if st.button("💾 保存修改"):
-            save_students(edited_df)
-            st.success("名单已更新")
+    st.markdown("---")
+    st.markdown("📊 **当前名册明细** (如需修改状态请直接在飞书App操作)")
+    s_view = fetch_feishu_data(TABLE_ID_STUDENTS)
+    if not s_view.empty:
+        st.dataframe(s_view[["姓名", "状态"]], use_container_width=True)
 
-# -------------------------- 4. 导出21天表 --------------------------
-elif menu == "📄 导出21天记录表":
-    st.subheader("📄 抗遗忘表导出")
-    r_df = load_records()
-    names = r_df['姓名'].unique()
-    if len(names) > 0:
+# --- 模块 4：历史记录总表 ---
+elif menu == "📊 历史数据总表":
+    st.subheader("📊 云端课时总览")
+    all_r = fetch_feishu_data(TABLE_ID_RECORDS)
+    if not all_r.empty:
+        st.dataframe(all_r, use_container_width=True)
+    else:
+        st.info("尚无记录")
+
+# --- 模块 5：导出21天表 ---
+elif menu == "📄 导出21天表":
+    st.subheader("📄 抗遗忘周期表导出")
+    r_all = fetch_feishu_data(TABLE_ID_RECORDS)
+    if not r_all.empty:
+        names = r_all['姓名'].unique()
         target = st.selectbox("选择学生", names)
-        if st.button("生成"):
-            student_df = r_df[r_df['姓名'] == target].sort_values("学习日期")
-            output = [["单词记忆21天抗遗忘周期记录表", "", "", "", "", "", "", "", "", "", "", "", ""],
+        if st.button("生成 21 天 CSV 表格"):
+            sub = r_all[r_all['姓名'] == target].sort_values("学习日期")
+            output = [["21天抗遗忘周期记录表", "", "", "", "", "", "", "", "", "", "", "", ""],
                       [f"学生姓名：{target}", "", "", "", "", "", "", "", "", "", "", "", ""],
                       ["日期", "复习", "新学", "第1天", "第2天", "第3天", "第5天", "第7天", "第9天", "第12天", "第14天", "第17天", "第21天"]]
-            for _, row in student_df.iterrows():
+            for _, row in sub.iterrows():
                 ld = datetime.datetime.strptime(row['学习日期'], "%Y-%m-%d")
                 rvs = [(ld + datetime.timedelta(days=d-1)).strftime("%Y/%m/%d") for d in REVIEW_DAYS]
                 output.append([row['学习日期'], "", ""] + rvs)
                 output.append([""]*13)
-            csv_buf = io.StringIO()
-            import csv
-            writer = csv.writer(csv_buf)
-            writer.writerows(output)
-            st.download_button(f"📥 下载表格", csv_buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
-
-# -------------------------- 5. 历史记录总表 --------------------------
-elif menu == "📊 历史记录总表":
-    st.subheader("📊 历史明细")
-    st.dataframe(load_records(), use_container_width=True)
+            
+            buf = io.StringIO()
+            pd.DataFrame(output).to_csv(buf, index=False, header=False, encoding="utf-8-sig")
+            st.download_button("📥 点击下载表格", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
