@@ -103,32 +103,53 @@ if menu == "🔍 复习提醒查询":
     with st.spinner('正在同步飞书云端任务...'):
         r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     
+    # --- 新增：调试预览窗 (如果查不到，请点开这个看看) ---
+    with st.expander("📊 检查云端原始数据"):
+        if not r_df.empty:
+            st.write("云端获取到的原始记录：")
+            st.dataframe(r_df)
+        else:
+            st.warning("云端 records 表目前是空的，请确认录入是否成功，或飞书机器人是否有权限。")
+    # -----------------------------------------------
+
     if not r_df.empty and "学习日期" in r_df.columns:
-        # 处理日期
-        r_df['学习日期_dt'] = pd.to_datetime(r_df['学习日期']).dt.date
+        # 🛠️ 关键修复：兼容飞书的“毫秒时间戳”和“字符串日期”
+        try:
+            # 先尝试按毫秒转换，如果失败（比如是字符串）则保持原样
+            r_df['学习日期_dt'] = pd.to_datetime(r_df['学习日期'], unit='ms', errors='coerce').dt.date
+            # 如果转换后是空的（说明原本是字符串），则直接转换字符串
+            mask = r_df['学习日期_dt'].isna()
+            if mask.any():
+                r_df.loc[mask, '学习日期_dt'] = pd.to_datetime(r_df.loc[mask, '学习日期']).dt.date
+        except Exception as e:
+            st.error(f"日期转换出错: {e}")
+            r_df['学习日期_dt'] = pd.to_datetime(r_df['学习日期']).dt.date
+
         reminders = {}
-        
         for _, row in r_df.iterrows():
             # 计算天数差：查询日期 - 学习日期 + 1
-            diff = (q_date - row['学习日期_dt']).days + 1
-            if diff in REVIEW_DAYS:
+            # 比如 8月9日学习，8月9日查询，diff 应为 1 (第1天复习)
+            days_diff = (q_date - row['学习日期_dt']).days + 1
+            
+            if days_diff in REVIEW_DAYS:
                 name = row['姓名']
                 if name not in reminders: reminders[name] = []
-                reminders[name].append(row['学习日期'])
+                # 记录原始日期字符串用于文案显示
+                reminders[name].append(row['学习日期_dt'].strftime("%Y-%m-%d"))
         
         if reminders:
             st.error(f"🚨 今日共有 {len(reminders)} 位同学需复习")
             for name, dates in reminders.items():
                 with st.container(border=True):
                     st.markdown(f"👤 **学员姓名：{name}**")
+                    # 这里的 dates 已经是格式化好的字符串列表
                     msg = generate_wechat_msg(name, q_date, dates)
                     st.code(msg, language=None)
                     st.caption("✨ 点击右上角图标一键复制文案")
         else:
             st.info("💡 该日期暂无复习任务")
     else:
-        st.info("💡 云端尚无课时记录，请先录入。")
-
+        st.info("💡 云端尚无课时记录，或飞书列名不匹配。")
 # --- 模块 2：录入课时记录 ---
 elif menu == "📝 录入课时记录":
     st.subheader("📝 课时录入")
