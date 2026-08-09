@@ -210,33 +210,54 @@ elif menu == "👤 学生库管理":
     else:
         st.info("库中尚无学员信息")
 
+
 # --- 模块 4：历史数据总览 ---
 elif menu == "📊 历史数据总览":
     st.subheader("📊 历史记录（飞书实时同步）")
     all_r = fetch_feishu_data(TABLE_ID_RECORDS)
     if not all_r.empty:
+        # 🛠️ 修复：将飞书的毫秒时间戳转为可读的日期格式
+        if "学习日期" in all_r.columns:
+            all_r['学习日期'] = pd.to_datetime(all_r['学习日期'], unit='ms', errors='coerce').dt.strftime('%Y-%m-%d')
+        
         st.dataframe(all_r, use_container_width=True)
     else:
         st.info("尚无记录")
-
+        
 # --- 模块 5：导出21天表 ---
 elif menu == "📄 导出21天表":
-    st.subheader("📄 抗遗忘表导出")
+    st.subheader("📄 抗遗忘周期表导出")
     r_all = fetch_feishu_data(TABLE_ID_RECORDS)
     if not r_all.empty:
+        # 🛠️ 预处理：先把所有时间戳转为日期对象，方便后面计算
+        r_all['学习日期_dt'] = pd.to_datetime(r_all['学习日期'], unit='ms', errors='coerce').dt.date
+        
         names = r_all['姓名'].unique()
         target = st.selectbox("选择学生", names)
+        
         if st.button("生成 21 天 CSV 表格"):
-            sub = r_all[r_all['姓名'] == target].sort_values("学习日期")
-            output = [["21天抗遗忘周期记录表", "", "", "", "", "", "", "", "", "", "", "", ""],
-                      [f"学生姓名：{target}", "", "", "", "", "", "", "", "", "", "", "", ""],
-                      ["日期", "复习", "新学", "第1天", "第2天", "第3天", "第5天", "第7天", "第9天", "第12天", "第14天", "第17天", "第21天"]]
-            for _, row in sub.iterrows():
-                ld = datetime.datetime.strptime(row['学习日期'], "%Y-%m-%d")
-                rvs = [(ld + datetime.timedelta(days=d-1)).strftime("%Y/%m/%d") for d in REVIEW_DAYS]
-                output.append([row['学习日期'], "", ""] + rvs)
-                output.append([""]*13)
+            # 筛选学生并按日期排序
+            sub = r_all[r_all['姓名'] == target].sort_values("学习日期_dt")
             
+            output = [
+                ["21天抗遗忘周期记录表", "", "", "", "", "", "", "", "", "", "", "", ""],
+                [f"学生姓名：{target}", "", "", "", "", "", "", "", "", "", "", "", ""],
+                ["日期", "复习", "新学", "第1天", "第2天", "第3天", "第5天", "第7天", "第9天", "第12天", "第14天", "第17天", "第21天"]
+            ]
+            
+            for _, row in sub.iterrows():
+                ld = row['学习日期_dt']  # 这已经是日期对象了
+                if pd.isna(ld): continue # 跳过空行
+                
+                # 计算10个复习日期
+                rvs = [(ld + datetime.timedelta(days=d-1)).strftime("%Y/%m/%d") for d in REVIEW_DAYS]
+                
+                # 行内容：日期 | 复习(空) | 新学(空) | 10个计算出的日期
+                row_content = [ld.strftime("%Y/%m/%d"), "", ""] + rvs
+                output.append(row_content)
+                output.append([""]*13) # 匹配你的模板，每行加个空行
+            
+            # 生成下载
             buf = io.StringIO()
             pd.DataFrame(output).to_csv(buf, index=False, header=False, encoding="utf-8-sig")
-            st.download_button("📥 点击下载表格", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
+            st.download_button(f"📥 下载 {target} 的表", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
