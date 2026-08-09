@@ -4,22 +4,22 @@ import requests
 import pandas as pd
 import datetime
 import io
+import json
 
 # -------------------------- 1. 安全配置 (从 Secrets 读取) --------------------------
-# 请确保在 Streamlit Cloud 的 Settings -> Secrets 中已填好这些 ID
 APP_ID = st.secrets["FEISHU_APP_ID"]
 APP_SECRET = st.secrets["FEISHU_APP_SECRET"]
 APP_TOKEN = st.secrets["FEISHU_APP_TOKEN"]
 TABLE_ID_STUDENTS = st.secrets["TABLE_ID_STUDENTS"]
 TABLE_ID_RECORDS = st.secrets["TABLE_ID_RECORDS"]
 
-# -------------------------- 2. 基础业务配置 --------------------------
+# 复习周期配置
 REVIEW_DAYS = [1, 2, 3, 5, 7, 9, 12, 14, 17, 21]
-LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初中阅读", "初中语法", "高中阅读", "高中完型", "长难句"]
+LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初中阅读", "初中语法", "高中阅读", "长难句"]
 HOURS_OPTIONS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
 STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业"]
 
-# -------------------------- 3. 飞书 API 工具函数 --------------------------
+# -------------------------- 2. 飞书 API 工具函数 --------------------------
 
 def get_tenant_access_token():
     """获取飞书授权令牌"""
@@ -40,15 +40,13 @@ def fetch_feishu_data(table_id):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records?page_size=500"
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        r = requests.get(url, headers=headers)
-        items = r.json().get("data", {}).get("items", [])
-        if not items: return pd.DataFrame()
-        
-        data = []
-        for item in items:
-            fields = item["fields"]
-            data.append(fields)
-        return pd.DataFrame(data)
+        r = requests.get(url, headers=headers, timeout=10)
+        res_json = r.json()
+        if res_json.get("code") != 0:
+            st.error(f"读取失败: {res_json.get('msg')}")
+            return pd.DataFrame()
+        items = res_json.get("data", {}).get("items", [])
+        return pd.DataFrame([item["fields"] for item in items]) if items else pd.DataFrame()
     except:
         return pd.DataFrame()
 
@@ -57,13 +55,13 @@ def add_feishu_record(table_id, fields):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    payload = {"fields": fields}
-    r = requests.post(url, headers=headers, json=payload)
+    r = requests.post(url, headers=headers, json={"fields": fields})
     return r.json()
 
 def generate_wechat_msg(name, review_date, learn_dates):
     """生成符合老师要求的微信复制文案"""
     rv_date_str = review_date.strftime("%m月%d日")
+    # 对学习日期进行排序和格式化
     sorted_ln = sorted(list(set(learn_dates)))
     ln_dates_str = "\n".join([datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%m月%d日学习内容") for d in sorted_ln])
     
@@ -77,9 +75,9 @@ def generate_wechat_msg(name, review_date, learn_dates):
 
 也请家长把复习视频发到群里🌹"""
 
-# -------------------------- 4. 界面布局 (手机端优化) --------------------------
+# -------------------------- 3. 界面布局 (手机端优化) --------------------------
 
-st.set_page_config(page_title="21天抗遗忘系统", layout="centered", page_icon="🎯")
+st.set_page_config(page_title="21天抗遗忘管理系统", layout="centered", page_icon="🎯")
 
 # 针对手机端增大按钮和文字
 st.markdown("""
@@ -90,17 +88,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 顶部每日代办红框提醒 ---
 today = datetime.date.today()
-# 这里为了性能，只在进入复习提醒模块时查询，或在此处做一个简易检测
-st.sidebar.caption(f"当前日期: {today}")
 
-# --- 功能导航 (下拉菜单最适合手机) ---
-menu = st.selectbox("📌 请选择功能模块", ["🔍 复习提醒查询", "📝 录入课时记录", "👤 学生库管理", "📊 历史数据总表", "📄 导出21天表"])
+# 下拉菜单导航
+menu = st.selectbox("📌 请选择功能模块", ["🔍 复习提醒查询", "📝 录入课时记录", "👤 学生库管理", "📊 历史数据总览", "📄 导出21天表"])
 
-# -------------------------- 5. 各模块功能逻辑 --------------------------
+# -------------------------- 4. 各模块功能逻辑 --------------------------
 
-# --- 模块 1：复习提醒 ---
+# --- 模块 1：复习提醒查询 ---
 if menu == "🔍 复习提醒查询":
     st.subheader("🔍 复习提醒查询")
     q_date = st.date_input("选择查询日期", today)
@@ -109,7 +104,7 @@ if menu == "🔍 复习提醒查询":
         r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     
     if not r_df.empty and "学习日期" in r_df.columns:
-        # 将飞书日期列转换为日期对象
+        # 处理日期
         r_df['学习日期_dt'] = pd.to_datetime(r_df['学习日期']).dt.date
         reminders = {}
         
@@ -127,7 +122,6 @@ if menu == "🔍 复习提醒查询":
                 with st.container(border=True):
                     st.markdown(f"👤 **学员姓名：{name}**")
                     msg = generate_wechat_msg(name, q_date, dates)
-                    # 使用 st.code 自带一键复制图标
                     st.code(msg, language=None)
                     st.caption("✨ 点击右上角图标一键复制文案")
         else:
@@ -135,7 +129,7 @@ if menu == "🔍 复习提醒查询":
     else:
         st.info("💡 云端尚无课时记录，请先录入。")
 
-# --- 模块 2：录入课时 ---
+# --- 模块 2：录入课时记录 ---
 elif menu == "📝 录入课时记录":
     st.subheader("📝 课时录入")
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
@@ -144,7 +138,7 @@ elif menu == "📝 录入课时记录":
         active_students = s_df[s_df['状态'] == "在读/上课"]['姓名'].tolist()
     
     if not active_students:
-        st.warning("⚠️ 库中没有在读学员，请先去'学生库管理'添加。")
+        st.warning("⚠️ 请先去'学生库管理'添加在读学员")
     else:
         with st.form("lesson_form"):
             name = st.selectbox("👤 选择学生", active_students)
@@ -153,15 +147,21 @@ elif menu == "📝 录入课时记录":
             hour = st.select_slider("⏰ 课时数", options=HOURS_OPTIONS, value=1.0)
             
             if st.form_submit_button("💾 保存并同步到飞书"):
+                # 🛠️ 关键修复：飞书日期字段需要 13 位毫秒时间戳
+                timestamp = int(datetime.datetime.combine(date, datetime.time()).timestamp() * 1000)
                 fields = {
                     "姓名": name,
-                    "学习日期": date.strftime("%Y-%m-%d"),
+                    "学习日期": timestamp,
                     "学习内容": content,
                     "课时": hour
                 }
                 res = add_feishu_record(TABLE_ID_RECORDS, fields)
-                st.success(f"✅ 已存入飞书云端！学员：{name}")
-                st.balloons()
+                if res.get("code") == 0:
+                    st.success(f"✅ 已存入飞书！学员：{name}")
+                    st.balloons()
+                else:
+                    st.error(f"❌ 录入失败！")
+                    st.json(res) # 显示报错细节，方便排查列名对错
 
 # --- 模块 3：学生库管理 ---
 elif menu == "👤 学生库管理":
@@ -172,19 +172,26 @@ elif menu == "👤 学生库管理":
             n_status = st.selectbox("初始状态", STATUS_OPTIONS)
             if st.form_submit_button("确认入库"):
                 if n_name:
-                    add_feishu_record(TABLE_ID_STUDENTS, {"姓名": n_name, "状态": n_status})
-                    st.success(f"✅ {n_name} 已成功加入云端名册")
-                    st.rerun()
+                    res = add_feishu_record(TABLE_ID_STUDENTS, {"姓名": n_name, "状态": n_status})
+                    if res.get("code") == 0:
+                        st.success(f"✅ {n_name} 已入库")
+                        st.rerun()
+                    else:
+                        st.error("入库失败，请检查飞书列名")
+                        st.json(res)
 
     st.markdown("---")
-    st.markdown("📊 **当前名册明细** (如需修改状态请直接在飞书App操作)")
+    st.markdown("📊 **当前名册明细**")
     s_view = fetch_feishu_data(TABLE_ID_STUDENTS)
     if not s_view.empty:
+        # 如果有名册，显示出来，方便查看
         st.dataframe(s_view[["姓名", "状态"]], use_container_width=True)
+    else:
+        st.info("库中尚无学员信息")
 
-# --- 模块 4：历史记录总表 ---
-elif menu == "📊 历史数据总表":
-    st.subheader("📊 云端课时总览")
+# --- 模块 4：历史数据总览 ---
+elif menu == "📊 历史数据总览":
+    st.subheader("📊 历史记录（飞书实时同步）")
     all_r = fetch_feishu_data(TABLE_ID_RECORDS)
     if not all_r.empty:
         st.dataframe(all_r, use_container_width=True)
@@ -193,7 +200,7 @@ elif menu == "📊 历史数据总表":
 
 # --- 模块 5：导出21天表 ---
 elif menu == "📄 导出21天表":
-    st.subheader("📄 抗遗忘周期表导出")
+    st.subheader("📄 抗遗忘表导出")
     r_all = fetch_feishu_data(TABLE_ID_RECORDS)
     if not r_all.empty:
         names = r_all['姓名'].unique()
