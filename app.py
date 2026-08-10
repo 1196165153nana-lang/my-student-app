@@ -104,7 +104,7 @@ st.markdown("""
 }
  /* 主功能按钮：横向拉长+居中，不再贴左侧 */
     div.stButton > button {
-        width: 650px !important; /* 控制长方形横向长度，调大更宽 */
+        width: 400px !important; /* 控制长方形横向长度，调大更宽 */
         height: 100px !important;
         margin: 0 auto 15px auto !important; /* 水平居中 */
         font-size: 22px !important;
