@@ -136,7 +136,7 @@ justify-content: center !important; padding-left: 0 !important;
 footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
---- 全页面统一标题 ---
+# --- 全页面统一标题---
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-desc">专为英语单词教学打造的后台工具</p>', unsafe_allow_html=True) 
