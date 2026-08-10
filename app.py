@@ -17,12 +17,11 @@ TABLE_ID_RECORDS = st.secrets["TABLE_ID_RECORDS"]
 # 业务规则配置
 REVIEW_DAYS = [1, 2, 3, 5, 7, 9, 12, 14, 17, 21]
 LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初中阅读", "初中语法", "高中阅读", "高中完型", "长难句", "雅思", "托福", "四六级"]
-# 只有这些内容会触发 21 天复习提醒
 WORD_ONLY_CONTENTS = ["单词", "大学单词", "雅思单词", "旧数据补录", "导入"]
 HOURS_OPTIONS = [float(x)/2 for x in range(1, 21)] # 0.5 到 10.0 小时
 STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业"]
 
-ANIMAL_EMOJIS = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🦆", "🐸", "🦁"]
+ANIMAL_EMOJIS = ["✅🐱", "✅🐶", "✅🦊", "✅🐼", "✅🐨", "✅🐯", "✅🐰", "✅🦆", "✅🐸", "✅🦁"]
 
 # 初始化状态
 if 'menu_choice' not in st.session_state:
@@ -60,7 +59,6 @@ def add_feishu_record(table_id, fields):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    # 过滤掉本地临时计算字段
     forbidden = ["record_id", "显示日期", "标签", "小计", "单价", "分类", "dt", "月份", "学习日期_dt", "dt_obj", "统计课型", "序号", "总课时(h)", "上课日期", "日期文字"]
     clean_f = {k: v for k, v in fields.items() if k not in forbidden}
     try:
@@ -97,67 +95,58 @@ def generate_wechat_msg(name, review_date, learn_dates):
     ln_dates_str = "\n".join([datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%m月%d日单词学习内容") for d in sorted_ln])
     return f"【21天抗遗忘单词复习提醒】\n\n{rv_date_str}复习内容为：\n\n{ln_dates_str}\n\n请{name}同学抽出时间复习 巩固单词印象 加油哦💪期待下次的课堂哦"
 
-# -------------------------- 3. 响应式黄金比例样式 (PC两列, 手机一列) --------------------------
+# -------------------------- 3. 样式 --------------------------
 st.set_page_config(page_title="FishTeacher", layout="centered", page_icon="🐟")
 st.markdown("""
 <style> 
-/* 1. 限制电脑端最大宽度 */ 
 .block-container { max-width: 850px !important; padding-top: 1rem !important; }
-/* 2. 响应式列宽：手机端自动变一列并撑满 */
 @media (max-width: 600px) {
 [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
 }
- /* 主功能按钮：横向拉长+居中，不再贴左侧 */
-    div.stButton > button {
-        width: 330px !important;
-        height: 100px !important;
-        margin: 0 auto 15px auto !important;
-        font-size: 22px !important;
-        font-weight: bold !important;
-        color: #FFFFFF !important;
-        background-color: #21242c !important;
-        border: 2px solid #5289f7 !important;
-        border-radius: 20px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        padding-left: 25px !important;
-        box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3) !important;
-    }
-    div.stButton > button:active { background-color: #5289f7 !important; }
+div.stButton > button {
+    width: 330px !important;
+    height: 100px !important;
+    margin: 0 auto 15px auto !important;
+    font-size: 22px !important;
+    font-weight: bold !important;
+    color: #FFFFFF !important;
+    background-color: #21242c !important;
+    border: 2px solid #5289f7 !important;
+    border-radius: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding-left: 25px !important;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3) !important;
+}
+div.stButton > button:active { background-color: #5289f7 !important; }
 
-/* 1 级：主大标题 */
 .brand-title {font-size: 32px;font-weight: bold;text-align: center;margin-bottom: 10px; }
-/* 2 级：小标题 */
-.brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px; text-align: center;}
-/* 3 级：更小的说明文本 */
+.brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px;}
 .brand-desc {font-size: 10px;color:#666666;text-align: center;margin-bottom: 15px;}
 
-/* 5. 返回按钮样式 */
 .back-btn-box div.stButton > button {
 height: 55px !important; font-size: 16px !important; width: 300px !important;
 background-color: transparent !important; border: 1px solid #555 !important;
 justify-content: center !important; padding-left: 0 !important;
 }
 
- /* 下拉弹窗每一条选项 */
-    div[data-baseweb="popover"] ul li {
+div[data-baseweb="popover"] ul li {
         min-height: 100px !important;
         font-size: 22px !important;
         padding: 12px 20px !important;
     }
-    div[data-baseweb="popover"] ul {
+div[data-baseweb="popover"] ul {
         background-color: #1c1e24 !important;
         border-radius: 16px !important;
     }
-    div[data-baseweb="popover"] ul li:hover {
+div[data-baseweb="popover"] ul li:hover {
         background-color: #333640 !important;
     }
-    div[data-baseweb="popover"] ul li[aria-selected="true"] {
+div[data-baseweb="popover"] ul li[aria-selected="true"] {
         background-color: #2a3142 !important;
     }
 
-/* ========== Toast弹窗：屏幕居中，带弹跳动画 ========== */
 div[data-testid="stToast"] {
     position: fixed !important;
     top: 45vh !important;
@@ -178,12 +167,10 @@ div[data-testid="stToast"] {
     100% { transform: translate(-50%, -50%) scale(1); opacity:1; }
 }
 
-/* 隐藏页脚 */
 footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 全页面统一标题---
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-desc">掌上拇指便捷管理</p>', unsafe_allow_html=True) 
@@ -261,7 +248,6 @@ elif st.session_state['menu_choice'] == "财务":
         ca.metric("总薪资", f"¥{m_df['小计'].sum():,.0f}")
         cb.metric("总时长", f"{m_df['课时'].sum():.1f}h")
         
-        # 精准汇总 (合并单词和旧数据)
         def merge_c(c):
             if c in ["单词", "旧数据补录", "导入", "大学单词", "雅思单词"]: return "单词课(合并)"
             return c
@@ -278,17 +264,37 @@ elif st.session_state['menu_choice'] == "财务":
             detail = m_df[m_df['姓名'] == search_n].sort_values(by='日期文字', ascending=False)
             st.dataframe(detail[['日期文字', '学习内容', '课时', '小计']], use_container_width=True, hide_index=True)
 
-# --- 模块：录入 ---
+# --- 模块：录入【增加同一天同一学生重复过滤】---
 elif st.session_state['menu_choice'] == "录入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
-    if not s_df.empty:
-        active_s = sorted(s_df[s_df['状态'] == "在读/上课"]['姓名'].tolist())
-        with st.form("in"):
-            name = st.selectbox("学生姓名", active_s); date = st.date_input("上课日期"); content = st.selectbox("内容", LEARN_CONTENTS); hour = st.selectbox("课时", HOURS_OPTIONS, index=1)
-            if st.form_submit_button("确认录入"):
+    record_df = fetch_feishu_data(TABLE_ID_RECORDS)
+
+    active_s = sorted(s_df[s_df['状态'] == "在读/上课"]['姓名'].tolist())
+    with st.form("in"):
+        name = st.selectbox("学生姓名", active_s)
+        date = st.date_input("上课日期")
+        content = st.selectbox("内容", LEARN_CONTENTS)
+        hour = st.selectbox("课时", HOURS_OPTIONS, index=1)
+
+        submit = st.form_submit_button("确认录入")
+        if submit:
+            # --------重复校验逻辑：同一个学生同一天是否已经存在课程--------
+            duplicate = False
+            if not record_df.empty:
+                record_df["parse_date"] = pd.to_datetime(record_df["学习日期"], unit="ms", errors="coerce").dt.date
+                # 筛选：姓名匹配 + 日期匹配
+                filter_cond = (record_df["姓名"] == name) & (record_df["parse_date"] == date)
+                if record_df[filter_cond].shape[0] > 0:
+                    duplicate = True
+
+            if duplicate:
+                # 重复，拦截，警告弹窗，不写入飞书
+                st.toast(f"⚠️ 重复录入：{name} 在 {date} 已经存在一节课！同一天只能录入1节课", icon="⚠️")
+            else:
+                # 无重复，正常写入
                 ts = int(datetime.datetime.combine(date, datetime.time()).timestamp() * 1000)
                 add_feishu_record(TABLE_ID_RECORDS, {"姓名": name, "学习日期": ts, "学习内容": content, "课时": hour})
                 emoji = random.choice(ANIMAL_EMOJIS)
