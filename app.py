@@ -134,7 +134,7 @@ justify-content: center !important; padding-left: 0 !important;
 }
  /* 下拉弹窗每一条选项 */
     div[data-baseweb="popover"] ul li {
-        min-height: 80px !important;
+        min-height: 100px !important;
         font-size: 22px !important;
         padding: 12px 20px !important;
     }
@@ -155,7 +155,7 @@ footer {visibility: hidden;}
 # --- 全页面统一标题---
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
-st.markdown('<p class="brand-desc">专为英语单词教学打造的后台工具</p>', unsafe_allow_html=True) 
+st.markdown('<p class="brand-desc">掌上拇指便捷管理</p>', unsafe_allow_html=True) 
 
 # -------------------------- 4. 逻辑分发 --------------------------
 
