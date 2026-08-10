@@ -146,7 +146,7 @@ st.markdown("""
 
 # --- 全页面统一标题 ---
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
-st.markdown('<p class="brand-subtitle">高效学员管理 & 21天抗遗忘系统</p>', unsafe_allow_html=True)
+st.markdown('<p class="brand-subtitle">🐟 FishTeacher</p>', unsafe_allow_html=True)
 
 # -------------------------- 4. 逻辑分发 --------------------------
 
