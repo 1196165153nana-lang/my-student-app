@@ -96,11 +96,11 @@ def generate_wechat_msg(name, review_date, learn_dates):
     return f"【21天抗遗忘单词复习提醒】\n\n{rv_date_str}复习内容为：\n\n{ln_dates_str}\n\n请{name}同学抽出时间复习 巩固单词印象 加油哦💪期待下次的课堂哦"
 
 # -------------------------- 3. 样式 --------------------------
-st.set_page_config(page_title="FishTeacher", layout="centered", page_icon="🐟")
+st.set_page_config(page_title="FishTeacher", layout="wide", page_icon="🐟")
 st.markdown("""
 <style>
-.block-container { max-width: 850px !important; padding-top: 1rem !important; }
-@media (max-width: 600px) {
+.block-container { max-width: 1400px !important; padding-top: 1rem !important; padding-left:2rem; padding-right:2rem; }
+@media (max-width: 768px) {
 [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
 }
 div.stButton > button {
@@ -226,7 +226,7 @@ elif st.session_state['menu_choice'] == "提醒":
                     st.markdown(f"👤 **{name}**"); st.code(generate_wechat_msg(name, q_date, dates), language=None)
         else: st.info("今日该学生无复习任务")
 
-# ==========【合并模块：账目&明细】==========
+# ==========【账目&明细｜层级：顶部月份+总指标，下方再左右分栏】==========
 elif st.session_state['menu_choice'] == "account":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -239,19 +239,26 @@ elif st.session_state['menu_choice'] == "account":
         r_df['月份'] = r_df['dt_obj'].dt.strftime('%Y-%m')
         r_df['日期文字'] = r_df['dt_obj'].dt.strftime('%Y-%m-%d')
 
-        tab1, tab2 = st.tabs(["💰月度财务统计", "📜全部流水&删除"])
+        # 顶部：月份选择 + 总薪资、总课时指标
+        target_m = st.selectbox("📅 选择月份", sorted(r_df['月份'].unique().tolist(), reverse=True))
+        m_df = r_df[r_df['月份'] == target_m].copy()
+        m_df['单价'] = m_df['学习内容'].apply(get_unit_price)
+        m_df['课时'] = pd.to_numeric(m_df['课时']).fillna(0)
+        m_df['小计'] = m_df['课时'] * m_df['单价']
 
-        with tab1:
-            target_m = st.selectbox("📅 选择月份", sorted(r_df['月份'].unique().tolist(), reverse=True))
-            m_df = r_df[r_df['月份'] == target_m].copy()
-            m_df['单价'] = m_df['学习内容'].apply(get_unit_price)
-            m_df['课时'] = pd.to_numeric(m_df['课时']).fillna(0)
-            m_df['小计'] = m_df['课时'] * m_df['单价']
+        col_metric_1, col_metric_2 = st.columns(2)
+        with col_metric_1:
+            st.metric("💰 本月总薪资", f"¥{m_df['小计'].sum():,.0f}")
+        with col_metric_2:
+            st.metric("⌛ 本月总课时", f"{m_df['课时'].sum():.1f} h")
 
-            ca, cb = st.columns(2)
-            ca.metric("总薪资", f"¥{m_df['小计'].sum():,.0f}")
-            cb.metric("总时长", f"{m_df['课时'].sum():.1f}h")
+        st.divider()
 
+        # 在总指标下面，再开启一层左右分栏：左=统计汇总，右=流水明细
+        col_stat, col_log = st.columns([5,5])
+
+        with col_stat:
+            st.subheader("📋 学生月度统计")
             def merge_c(c):
                 if c in ["单词", "旧数据补录", "导入", "大学单词", "雅思单词"]: return "单词课(合并)"
                 return c
@@ -260,17 +267,19 @@ elif st.session_state['menu_choice'] == "account":
             s_order = s_sum.groupby('姓名')['课时'].sum().reset_index().sort_values('课时', ascending=False)
             final = pd.merge(s_order[['姓名']], s_sum, on='姓名', how='left')
             final.insert(0, '序号', final['姓名'].map({n: i+1 for i, n in enumerate(s_order['姓名'].unique())}))
-            st.dataframe(final, use_container_width=True, hide_index=True)
+            st.dataframe(final, use_container_width=True, hide_index=True, height=340)
 
             st.write("---")
-            search_n = st.selectbox("🔍 选择学生看上课明细记录", ["请选择"] + final['姓名'].unique().tolist())
+            search_n = st.selectbox("🔍 选择学生查看当月明细", ["请选择"] + final['姓名'].unique().tolist())
             if search_n != "请选择":
                 detail = m_df[m_df['姓名'] == search_n].sort_values(by='日期文字', ascending=False)
                 st.dataframe(detail[['日期文字', '学习内容', '课时', '小计']], use_container_width=True, hide_index=True)
 
-        with tab2:
+        with col_log:
+            st.subheader("📜 全部流水记录（可删除）")
             show_df = r_df.copy()
-            st.dataframe(show_df[["姓名","日期文字","学习内容","课时"]], use_container_width=True, hide_index=True)
+            st.dataframe(show_df[["姓名","日期文字","学习内容","课时"]], use_container_width=True, hide_index=True, height=480)
+
             t = st.selectbox("🗑️ 删除记录", ["请选择"] + (show_df['姓名']+" | "+show_df['日期文字']).tolist())
             if t != "请选择" and st.checkbox("确认"):
                 if st.button("执行删除"):
@@ -356,7 +365,7 @@ elif st.session_state['menu_choice'] == "导出":
     st.markdown('</div>', unsafe_allow_html=True)
     r_all = fetch_feishu_data(TABLE_ID_RECORDS)
     if not r_all.empty:
-        r_all['dt'] = pd.to_datetime(r_all['学习日期'], unit='ms').dt.date
+        r_all['dt'] = pd.to_datetime(r_all['学习日期'], unit='ms', errors='coerce').dt.date
         target = st.selectbox("学员", sorted(r_all['姓名'].unique().tolist()))
         if st.button("生成"):
             sub = r_all[r_all['姓名'] == target].sort_values("dt")
