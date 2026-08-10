@@ -96,23 +96,13 @@ def generate_wechat_msg(name, review_date, learn_dates):
 
 # -------------------------- 3. 响应式黄金比例样式 (PC两列, 手机一列) --------------------------
 st.set_page_config(page_title="FishTeacher", layout="centered", page_icon="🐟")
-
 st.markdown("""
-    <style>
-    /* 加宽页面容器，减少左右留白 */
-    .block-container { 
-        max-width: 1400px !important; 
-        padding-top: 1rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-    }
-    
-    /* 手机端自动适配满屏 */
-    @media (max-width: 600px) {
-        [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
-    }
-
-    /* 主功能按钮：横向拉长+居中，不再贴左侧 */
+<style> /* 1. 限制电脑端最大宽度 */ .block-container { max-width: 850px !important; padding-top: 1rem !important; }
+/* 2. 响应式列宽：手机端自动变一列并撑满 */
+@media (max-width: 600px) {
+[data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
+}
+ /* 主功能按钮：横向拉长+居中，不再贴左侧 */
     div.stButton > button {
         width: 650px !important; /* 控制长方形横向长度，调大更宽 */
         height: 100px !important;
@@ -130,46 +120,26 @@ st.markdown("""
         box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3) !important;
     }
     div.stButton > button:active { background-color: #5289f7 !important; }
-
-    /* 标题样式 */
-    .brand-title {
-        font-size: 32px;
-        font-weight: bold;
-        text-align: center;
-        margin-bottom: 10px; 
-    }
-    .brand-subtitle { 
-        font-size: 30px; 
-        color:#444444;
-        text-align: center;
-        margin-bottom: 10px; 
-    }
-    .brand-desc {
-        font-size: 14px;
-        color:#666666;
-        text-align: center;
-        margin-bottom: 30px; 
-    }
-    
-    /* 返回小按钮单独样式，不受影响 */
-    .back-btn-box div.stButton > button {
-        width: 300px !important;
-        height: 55px !important; 
-        font-size: 16px !important;
-        background-color: transparent !important; 
-        border: 1px solid #555 !important;
-        justify-content: center !important; 
-        padding-left: 0 !important;
-    }
-    
-    footer {visibility: hidden;}
-    </style>
-    """, unsafe_allow_html=True)
-
-# 标题区域
+/* 1 级：主大标题 /
+.brand-title {font-size: 32px;font-weight: bold;text-align: center;margin-bottom: 10px; }
+/ 2 级：小标题 /
+.brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px; }
+/ 3 级：更小的说明文本（新增） */
+.brand-desc {font-size: 10px;color:#666666;text-align: center;margin-bottom: 15px;}
+/* 5. 返回按钮样式 */
+.back-btn-box div.stButton > button {
+height: 55px !important; font-size: 16px !important;
+background-color: transparent !important; border: 1px solid #555 !important;
+justify-content: center !important; padding-left: 0 !important;
+}
+/* 隐藏页脚 */
+footer {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+--- 全页面统一标题 ---
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
-st.markdown('<p class="brand-desc">专为英语单词教学打造的后台工具</p>', unsafe_allow_html=True)
+st.markdown('<p class="brand-desc">专为英语单词教学打造的后台工具</p>', unsafe_allow_html=True) 
 
 # -------------------------- 4. 逻辑分发 --------------------------
 
