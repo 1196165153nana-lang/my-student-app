@@ -126,10 +126,12 @@ st.markdown("""
     }
     div.stButton > button:active { background-color: #5289f7 !important; }
 
-    /* 4. 品牌标题样式 */
-    .brand-title { text-align: center; color: #4A90E2; font-size: 48px; font-weight: bold; margin-bottom: 0px; }
-    /* 首页的大副标题 */
-  .brand-subtitle { text-align: center; color: #888; font-size: 14px; margin-bottom: 10px; }
+   /* 1级：主大标题 */
+    .brand-title {font-size: 32px;font-weight: bold;}
+/* 2级：小标题 */
+    .brand-subtitle { font-size: 20px; color:#444444;}
+/* 3级：更小的说明文本（新增） */
+    .brand-desc {font-size: 16px;color:#666666;}
     
     /* 5. 返回按钮样式 */
     .back-btn-box div.stButton > button {
@@ -145,8 +147,8 @@ st.markdown("""
 
 # --- 全页面统一标题 ---
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
-st.markdown('<p class="brand-subtitle  font-size: 20px;">🐟 FishTeacher</p>', unsafe_allow_html=True)
-st.markdown('<p class="brand-subtitle">高效学员管理 & 21天抗遗忘系统</p>', unsafe_allow_html=True)
+st.markdown('<p class="brand-subtitle">🐟 FishTeacher</p>', unsafe_allow_html=True)
+st.markdown('<p class="brand-desc">专为英语单词教学打造的后台工具</p>', unsafe_allow_html=True)
 
 # -------------------------- 4. 逻辑分发 --------------------------
 
