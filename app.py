@@ -52,7 +52,7 @@ def add_feishu_record(table_id, fields):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    forbidden_keys = ["record_id", "显示日期", "标签", "小计", "单价", "分类", "dt", "月份", "学习日期_dt", "dt_obj"]
+    forbidden_keys = ["record_id", "显示日期", "标签", "小计", "单价", "分类", "dt", "月份", "学习日期_dt", "dt_obj", "总计(h)"]
     clean_f = {k: v for k, v in fields.items() if k not in forbidden_keys}
     try:
         r = requests.post(url, headers=headers, json={"fields": clean_f})
@@ -94,12 +94,11 @@ if st.session_state['undo_cache']:
 
 menu = st.selectbox("📌 切换功能", ["📊 工资财务统计", "📝 课时录入", "🔍 单词复习提醒", "👤 学生库管理", "📜 历史明细与删除", "📄 导出21天表", "📥 导入旧数据"])
 
-# --- 模块：工资财务统计 (重点更新) ---
+# --- 模块：工资财务统计 ---
 if menu == "📊 工资财务统计":
     st.subheader("💰 当月工资与课时核算")
     r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     if not r_df.empty:
-        # 数据处理
         r_df['dt_obj'] = pd.to_datetime(r_df['学习日期'], unit='ms', errors='coerce')
         r_df['月份'] = r_df['dt_obj'].dt.strftime('%Y-%m')
         target_m = st.selectbox("选择月份", sorted(r_df['月份'].unique().tolist(), reverse=True))
@@ -109,33 +108,39 @@ if menu == "📊 工资财务统计":
         m_df['课时'] = pd.to_numeric(m_df['课时']).fillna(0)
         m_df['小计'] = m_df['课时'] * m_df['单价']
         
-        # 1. 总体概览
         st.metric("当月总薪资", f"¥{m_df['小计'].sum():,.2f}")
         
-        # 2. 分类价格统计
-        st.markdown("#### 📑 价格档位汇总")
+        # 1. 价格档位汇总
+        st.markdown("#### 📑 价格档位统计")
         summary = m_df.groupby('单价').agg({'课时': 'sum', '小计': 'sum'}).reset_index()
-        summary.columns = ["单价(元)", "总数量(h)", "应发小计(元)"]
+        summary.columns = ["单价(元)", "总时长(h)", "应发小计(元)"]
         st.table(summary)
         
-        # 3. 【新增】每个学生每个课型的总课时统计
-        st.markdown("#### 👤 学生课时明细")
-        # 按 姓名 和 学习内容 分组求和
-        student_detail = m_df.groupby(['姓名', '学习内容']).agg({'课时': 'sum'}).reset_index()
-        # 排序：先按姓名，再按课时降序
-        student_detail = student_detail.sort_values(by=['姓名', '课时'], ascending=[True, False])
-        student_detail.columns = ["学生姓名", "课程类型", "累计课时(h)"]
+        # 2. 【核心更新】学生维度透视汇总（姓名唯一化）
+        st.markdown("#### 👤 学生课时汇总 (同名已合并)")
+        # 使用透视表：行=姓名，列=学习内容，值=课时总和
+        pivot_df = m_df.pivot_table(
+            index='姓名', 
+            columns='学习内容', 
+            values='课时', 
+            aggfunc='sum', 
+            fill_value=0
+        )
+        # 计算每个学生的横向总和
+        pivot_df['总计(h)'] = pivot_df.sum(axis=1)
+        # 按总时长降序排列
+        pivot_df = pivot_df.sort_values(by='总计(h)', ascending=False)
         
-        # 使用 dataframe 展示，支持手机滑动，且看起来很整齐
-        st.dataframe(student_detail, use_container_width=True, hide_index=True)
+        st.dataframe(pivot_df, use_container_width=True)
+        st.caption("💡 提示：表格上方可以左右滑动查看完整课型分布")
         
-        # 4. 导出当月明细
+        # 3. 导出
         csv = m_df[["姓名", "学习日期", "学习内容", "课时", "小计"]].to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 下载当月账单(CSV)", csv, f"{target_m}_工资明细.csv", "text/csv")
+        st.download_button("📥 下载当月原始明细", csv, f"{target_m}_明细.csv", "text/csv")
         
     else: st.info("云端暂无数据")
 
-# --- 其余模块保持不变 ---
+# --- 其余模块代码保持逻辑同步 ---
 elif menu == "📝 课时录入":
     st.subheader("📝 课时快速录入")
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
@@ -165,7 +170,7 @@ elif menu == "🔍 单词复习提醒":
                 if diff in REVIEW_DAYS:
                     n = row['姓名']
                     if target_s != "全部" and n != target_s: continue
-                    if n not in reminders: reminders[n] = []
+                    if n not in reminders: reminders[name] = []
                     reminders[n].append(row['dt'].strftime("%Y-%m-%d"))
         if reminders:
             for name, dates in reminders.items():
@@ -178,8 +183,7 @@ elif menu == "👤 学生库管理":
     st.subheader("👥 学员信息库")
     with st.expander("➕ 添加学员"):
         with st.form("add"):
-            n = st.text_input("姓名")
-            s = st.selectbox("状态", STATUS_OPTIONS)
+            n = st.text_input("姓名"); s = st.selectbox("状态", STATUS_OPTIONS)
             if st.form_submit_button("确认"):
                 if n: add_feishu_record(TABLE_ID_STUDENTS, {"姓名": n, "状态": s})
                 st.rerun()
@@ -201,7 +205,7 @@ elif menu == "📜 历史明细与删除":
         all_r['显示日期'] = pd.to_datetime(all_r['学习日期'], unit='ms').dt.strftime('%Y-%m-%d')
         st.dataframe(all_r[["姓名","显示日期","学习内容","课时"]], use_container_width=True)
         target = st.selectbox("🗑️ 删除记录", ["请选择"] + (all_r['姓名']+" | "+all_r['显示日期']+" | "+all_r['学习内容']).tolist())
-        if target != "请选择" and st.checkbox("确认删除该条"):
+        if target != "请选择" and st.checkbox("确认删除"):
             if st.button("执行"):
                 idx = (all_r['姓名']+" | "+all_r['显示日期']+" | "+all_r['学习内容']).tolist().index(target)
                 row = all_r.iloc[idx].to_dict()
