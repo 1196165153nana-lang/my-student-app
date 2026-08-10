@@ -22,7 +22,7 @@ WORD_ONLY_CONTENTS = ["单词", "大学单词", "雅思单词", "旧数据补录
 HOURS_OPTIONS = [float(x)/2 for x in range(1, 21)] # 0.5 到 10.0 小时
 STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业"]
 
-ANIMAL_EMOJIS = ["✅🐱", "✅🐶", "✅🦊", "✅🐼", "✅🐨", "✅🐯", "✅🐰", "✅🦆", "✅🐸", "✅🦁"]
+ANIMAL_EMOJIS = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🦆", "🐸", "🦁"]
 
 # 初始化状态
 if 'menu_choice' not in st.session_state:
