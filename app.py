@@ -131,7 +131,7 @@ st.markdown("""
 /* 2级：小标题 */
     .brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px; }
 /* 3级：更小的说明文本（新增） */
-    .brand-desc {font-size: 16px;color:#666666;text-align: center;margin-bottom: 15px; }
+    .brand-desc {font-size: 10px;color:#666666;text-align: center;margin-bottom: 15px; }
     
     /* 5. 返回按钮样式 */
     .back-btn-box div.stButton > button {
