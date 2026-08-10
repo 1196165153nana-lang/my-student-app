@@ -100,10 +100,10 @@ st.set_page_config(page_title="FishTeacher", layout="centered", page_icon="🐟"
 st.markdown("""
     <style>
     /* 1. 限制电脑端最大宽度 */
-    .block-container { max-width: 850px !important; padding-top: 1rem !important; }
+    .block-container { max-width: 1000px !important; padding-top: 1rem !important; }
     
     /* 2. 响应式列宽：手机端自动变一列并撑满 */
-    @media (max-width: 600px) {
+    @media (max-width: 1000px) {
         [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
     }
 
