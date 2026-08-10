@@ -99,25 +99,30 @@ st.set_page_config(page_title="FishTeacher", layout="centered", page_icon="🐟"
 
 st.markdown("""
     <style>
-    /* 1. 限制电脑端最大宽度 */
-    .block-container { max-width: 850px !important; padding-top: 1rem !important; }
+    /* 加宽页面容器，减少左右留白 */
+    .block-container { 
+        max-width: 1400px !important; 
+        padding-top: 1rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
     
-    /* 2. 响应式列宽：手机端自动变一列并撑满 */
-    @media (max-width: 3000px) {
+    /* 手机端自动适配满屏 */
+    @media (max-width: 600px) {
         [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
     }
 
-    /* 3. 蓝色边框长方形按钮样式 */
+    /* 主功能按钮：横向拉长+居中，不再贴左侧 */
     div.stButton > button {
-        width: 100% !important;
+        width: 650px !important; /* 控制长方形横向长度，调大更宽 */
         height: 100px !important;
+        margin: 0 auto 15px auto !important; /* 水平居中 */
         font-size: 22px !important;
         font-weight: bold !important;
         color: #FFFFFF !important;
         background-color: #21242c !important;
         border: 2px solid #5289f7 !important;
         border-radius: 20px !important;
-        margin-bottom: 15px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: flex-start !important;
@@ -126,26 +131,42 @@ st.markdown("""
     }
     div.stButton > button:active { background-color: #5289f7 !important; }
 
-   /* 1级：主大标题 */
-    .brand-title {font-size: 32px;font-weight: bold;text-align: center;margin-bottom: 10px; }
-/* 2级：小标题 */
-    .brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px; }
-/* 3级：更小的说明文本（新增） */
-    .brand-desc {font-size: 10px;color:#666666;text-align: center;margin-bottom: 15px; }
-    
-    /* 5. 返回按钮样式 */
-    .back-btn-box div.stButton > button {
-        height: 55px !important; font-size: 16px !important;
-        background-color: transparent !important; border: 1px solid #555 !important;
-        justify-content: center !important; padding-left: 0 !important;
+    /* 标题样式 */
+    .brand-title {
+        font-size: 32px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 10px; 
+    }
+    .brand-subtitle { 
+        font-size: 30px; 
+        color:#444444;
+        text-align: center;
+        margin-bottom: 10px; 
+    }
+    .brand-desc {
+        font-size: 14px;
+        color:#666666;
+        text-align: center;
+        margin-bottom: 30px; 
     }
     
-    /* 隐藏页脚 */
+    /* 返回小按钮单独样式，不受影响 */
+    .back-btn-box div.stButton > button {
+        width: 300px !important;
+        height: 55px !important; 
+        font-size: 16px !important;
+        background-color: transparent !important; 
+        border: 1px solid #555 !important;
+        justify-content: center !important; 
+        padding-left: 0 !important;
+    }
+    
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 全页面统一标题 ---
+# 标题区域
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-desc">专为英语单词教学打造的后台工具</p>', unsafe_allow_html=True)
