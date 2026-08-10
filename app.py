@@ -104,7 +104,7 @@ st.markdown("""
 }
  /* 主功能按钮：横向拉长+居中，不再贴左侧 */
     div.stButton > button {
-        width: 350px !important; /* 控制长方形横向长度，调大更宽 */
+        width: 330px !important; /* 控制长方形横向长度，调大更宽 */
         height: 100px !important;
         margin: 0 auto 15px auto !important; /* 水平居中 */
         font-size: 22px !important;
@@ -134,7 +134,7 @@ justify-content: center !important; padding-left: 0 !important;
 }
  /* 下拉弹窗每一条选项 */
     div[data-baseweb="popover"] ul li {
-        min-height: 65px !important;
+        min-height: 80px !important;
         font-size: 22px !important;
         padding: 12px 20px !important;
     }
