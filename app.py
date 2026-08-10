@@ -116,7 +116,7 @@ st.markdown("""
     /* 3. 蓝色边框长方形按钮 */
     div.stButton > button {
         width: 100% !important;
-        height: 100px !important;
+        height: 100% !important;
         font-size: 22px !important;
         font-weight: bold !important;
         color: #FFFFFF !important;
