@@ -127,11 +127,11 @@ st.markdown("""
     div.stButton > button:active { background-color: #5289f7 !important; }
 
    /* 1级：主大标题 */
-    .brand-title {font-size: 32px;font-weight: bold;}
+    .brand-title {font-size: 32px;font-weight: bold;text-align: center;}
 /* 2级：小标题 */
-    .brand-subtitle { font-size: 20px; color:#444444;}
+    .brand-subtitle { font-size: 20px; color:#444444;text-align: center;}
 /* 3级：更小的说明文本（新增） */
-    .brand-desc {font-size: 16px;color:#666666;}
+    .brand-desc {font-size: 16px;color:#666666;text-align: center;}
     
     /* 5. 返回按钮样式 */
     .back-btn-box div.stButton > button {
@@ -147,7 +147,7 @@ st.markdown("""
 
 # --- 全页面统一标题 ---
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
-st.markdown('<p class="brand-subtitle">🐟 FishTeacher</p>', unsafe_allow_html=True)
+st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-desc">专为英语单词教学打造的后台工具</p>', unsafe_allow_html=True)
 
 # -------------------------- 4. 逻辑分发 --------------------------
