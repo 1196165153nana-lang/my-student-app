@@ -149,6 +149,8 @@ st.markdown("""
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
+  st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
+  st.markdown('<p class="brand-subtitle">高效学员管理 & 21天抗遗忘系统</p>', unsafe_allow_html=True)
 
 # -------------------------- 4. 逻辑控制分发 --------------------------
 
