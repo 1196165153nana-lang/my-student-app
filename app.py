@@ -127,11 +127,11 @@ st.markdown("""
     div.stButton > button:active { background-color: #5289f7 !important; }
 
    /* 1级：主大标题 */
-    .brand-title {font-size: 32px;font-weight: bold;text-align: center;}
+    .brand-title {font-size: 32px;font-weight: bold;text-align: center;margin-bottom: 10px; }
 /* 2级：小标题 */
-    .brand-subtitle { font-size: 20px; color:#444444;text-align: center;}
+    .brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px; }
 /* 3级：更小的说明文本（新增） */
-    .brand-desc {font-size: 16px;color:#666666;text-align: center;}
+    .brand-desc {font-size: 16px;color:#666666;text-align: center;margin-bottom: 15px; }
     
     /* 5. 返回按钮样式 */
     .back-btn-box div.stButton > button {
