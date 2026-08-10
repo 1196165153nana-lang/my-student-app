@@ -16,6 +16,7 @@ TABLE_ID_RECORDS = st.secrets["TABLE_ID_RECORDS"]
 # 业务规则
 REVIEW_DAYS = [1, 2, 3, 5, 7, 9, 12, 14, 17, 21]
 LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初中阅读", "初中语法", "高中阅读", "高中完型", "长难句", "雅思", "托福", "四六级"]
+# 定义哪些内容触发复习提醒（包含搬家数据）
 WORD_ONLY_CONTENTS = ["单词", "大学单词", "雅思单词", "旧数据补录", "导入"]
 HOURS_OPTIONS = [float(x)/2 for x in range(1, 21)]
 STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业"]
@@ -80,113 +81,80 @@ def generate_wechat_msg(name, review_date, learn_dates):
     ln_dates_str = "\n".join([datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%m月%d日单词学习内容") for d in sorted_ln])
     return f"【21天抗遗忘单词复习提醒】\n\n{rv_date_str}复习内容为：\n\n{ln_dates_str}\n\n请{name}同学抽出时间复习 巩固单词印象 加油哦💪期待下次的课堂哦"
 
-# -------------------------- 3. 极简全宽自适应样式 --------------------------
+# -------------------------- 3. 终极全宽自适应样式 (强制顶格) --------------------------
 st.set_page_config(page_title="FishTeacher", layout="wide", page_icon="🐟")
 
 st.markdown("""
     <style>
-    .block-container { max-width: 100% !important; padding: 1.5rem !important; }
+    /* 1. 强制页面最外层容器铺满屏幕，消除侧边空白 */
+    .block-container {
+        max-width: 100% !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        padding-top: 1rem !important;
+    }
     
-    /* 首页长方形大按钮 */
+    /* 2. 标题和副标题样式 */
+    .brand-title { text-align: center; color: #4A90E2; font-size: 48px; font-weight: bold; margin-top: 5px; margin-bottom: 0px; }
+    .brand-subtitle { text-align: center; color: #888; font-size: 16px; margin-bottom: 30px; }
+
+    /* 3. 首页大按钮：全宽长方形，方便单手点击 */
     div.stButton > button {
         width: 100% !important;
-        height: 90px !important;
-        font-size: 20px !important;
+        height: 85px !important;
+        font-size: 22px !important;
         font-weight: bold !important;
         color: #FFFFFF !important;
         background-color: #262730 !important;
         border: 2px solid #4A90E2 !important;
-        border-radius: 15px !important;
-        margin-bottom: 10px !important;
+        border-radius: 12px !important;
+        margin-bottom: 12px !important;
+        display: block !important;
     }
+    div.stButton > button:active { background-color: #4A90E2 !important; }
     
-    .brand-title { text-align: center; color: #4A90E2; font-size: 48px; font-weight: bold; margin-bottom: 0px; }
-    .brand-subtitle { text-align: center; color: #888; font-size: 14px; margin-bottom: 40px; }
+    /* 4. 返回按钮（全宽但高度适中） */
+    .back-btn-box div.stButton > button {
+        height: 55px !important;
+        font-size: 18px !important;
+        background-color: transparent !important;
+        border: 1px solid #555 !important;
+    }
 
-    .back-btn-box div.stButton > button { height: 50px !important; font-size: 16px !important; background-color: transparent !important; border: 1px solid #555 !important; }
-    
-    /* 表格字体大小优化 */
-    .stDataFrame, .stTable { width: 100% !important; font-size: 16px !important; }
-    
+    /* 5. 所有的表格、下拉框、输入框强制 100% 宽度 */
+    .stDataFrame, .stTable, .stSelectbox, .stDateInput, [data-testid="stForm"] {
+        width: 100% !important;
+    }
+
+    /* 隐藏默认页脚 */
     footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# -------------------------- 4. 逻辑处理 --------------------------
+# -------------------------- 4. 逻辑控制分发 --------------------------
 
 def back_home():
     st.session_state['menu_choice'] = "首页"
     st.rerun()
 
-# --- 首页 ---
+# --- 首页：全宽垂直菜单 ---
 if st.session_state['menu_choice'] == "首页":
     st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
     st.markdown('<p class="brand-subtitle">高效学员管理 & 21天抗遗忘系统</p>', unsafe_allow_html=True)
     
+    # 全部采用单列排列，实现 100% 宽度拉长
     if st.button("🔍 单词复习提醒"): st.session_state['menu_choice'] = "提醒"; st.rerun()
     if st.button("📝 课时快速录入"): st.session_state['menu_choice'] = "录入"; st.rerun()
     if st.button("📊 财务账单核算"): st.session_state['menu_choice'] = "财务"; st.rerun()
     if st.button("👤 学生名册管理"): st.session_state['menu_choice'] = "名册"; st.rerun()
     if st.button("📜 历史流水明细"): st.session_state['menu_choice'] = "明细"; st.rerun()
     if st.button("📄 导出21天表格"): st.session_state['menu_choice'] = "导出"; st.rerun()
-    st.write("---")
+    
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
     if st.button("📥 批量数据导入"): st.session_state['menu_choice'] = "导入"; st.rerun()
 
-# --- 模块：财务核算 (重点更新：增加学生明细钻取) ---
-elif st.session_state['menu_choice'] == "财务":
-    st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
-    if st.button("🏠 返回主菜单"): back_home()
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.subheader("💰 财务核算与对账")
-    
-    with st.spinner('同步云端数据中...'):
-        r_df = fetch_feishu_data(TABLE_ID_RECORDS)
-    
-    if not r_df.empty:
-        r_df['dt_obj'] = pd.to_datetime(r_df['学习日期'], unit='ms', errors='coerce')
-        r_df['月份'] = r_df['dt_obj'].dt.strftime('%Y-%m')
-        r_df['上课日期'] = r_df['dt_obj'].dt.strftime('%Y-%m-%d')
-        
-        target_m = st.selectbox("📅 选择月份", sorted(r_df['月份'].unique().tolist(), reverse=True))
-        
-        m_df = r_df[r_df['月份'] == target_m].copy()
-        m_df['单价'] = m_df['学习内容'].apply(get_unit_price)
-        m_df['课时'] = pd.to_numeric(m_df['课时']).fillna(0)
-        m_df['小计'] = m_df['课时'] * m_df['单价']
-        
-        c1, c2 = st.columns(2)
-        c1.metric("当月总课酬", f"¥{m_df['小计'].sum():,.0f}")
-        c2.metric("当月总课时", f"{m_df['课时'].sum():.1f} h")
-        
-        st.write("---")
-        # 1. 汇总表
-        st.markdown("#### 👤 学生本月课时汇总")
-        student_sum = m_df.groupby('姓名').agg({'课时': 'sum', '小计': 'sum'}).reset_index()
-        student_sum = student_sum.sort_values(by='小计', ascending=False)
-        student_sum.insert(0, '序号', range(1, len(student_sum) + 1))
-        student_sum.columns = ["序号", "姓名", "总课时(h)", "总金额(元)"]
-        st.dataframe(student_sum, use_container_width=True, hide_index=True)
+# --- 各功能模块：均强制全宽 ---
 
-        st.write("---")
-        # 2. 【核心更新】穿透查看学生明细记录
-        st.markdown("#### 🔍 查看学生上课明细")
-        search_name = st.selectbox("选择学生姓名对账", student_sum['姓名'].tolist())
-        
-        if search_name:
-            # 筛选该学生当月的所有记录
-            detail_df = m_df[m_df['姓名'] == search_name].sort_values(by='上课日期', ascending=False)
-            detail_df = detail_df[['上课日期', '学习内容', '课时', '单价', '小计']]
-            detail_df.columns = ["上课日期", "课程类型", "时长(h)", "单价", "课酬小计"]
-            
-            st.info(f"学员 **{search_name}** 在 **{target_m}** 的所有记录如下：")
-            st.dataframe(detail_df, use_container_width=True, hide_index=True)
-            
-            # 单人小汇总
-            st.success(f"合计：{detail_df['时长(h)'].sum():.1f} 小时 | 共 ¥{detail_df['课酬小计'].sum():.0f}")
-
-    else: st.info("云端暂无记录")
-
-# --- 其他模块保持之前的逻辑 ---
 elif st.session_state['menu_choice'] == "提醒":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -195,8 +163,8 @@ elif st.session_state['menu_choice'] == "提醒":
     r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     if not r_df.empty:
         r_df['dt'] = pd.to_datetime(r_df['学习日期'], unit='ms', errors='coerce').dt.date
-        q_date = st.date_input("提醒日期", datetime.date.today())
-        target_s = st.selectbox("筛选学员", ["全部学生"] + sorted(r_df['姓名'].unique().tolist()))
+        q_date = st.date_input("选择提醒日期", datetime.date.today())
+        target_s = st.selectbox("🎯 指定学生", ["全部学生"] + sorted(r_df['姓名'].unique().tolist()))
         reminders = {}
         for _, row in r_df.iterrows():
             if row['学习内容'] in WORD_ONLY_CONTENTS:
@@ -213,40 +181,83 @@ elif st.session_state['menu_choice'] == "提醒":
                     st.code(generate_wechat_msg(name, q_date, dates), language=None)
         else: st.info("无复习任务")
 
+elif st.session_state['menu_choice'] == "财务":
+    st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
+    if st.button("🏠 返回主菜单"): back_home()
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.subheader("💰 财务核算与对账")
+    r_df = fetch_feishu_data(TABLE_ID_RECORDS)
+    if not r_df.empty:
+        r_df['dt_obj'] = pd.to_datetime(r_df['学习日期'], unit='ms', errors='coerce')
+        r_df['月份'] = r_df['dt_obj'].dt.strftime('%Y-%m')
+        r_df['上课日期'] = r_df['dt_obj'].dt.strftime('%Y-%m-%d')
+        target_m = st.selectbox("📅 选择月份", sorted(r_df['月份'].unique().tolist(), reverse=True))
+        m_df = r_df[r_df['月份'] == target_m].copy()
+        m_df['单价'] = m_df['学习内容'].apply(get_unit_price)
+        m_df['课时'] = pd.to_numeric(m_df['课时']).fillna(0)
+        m_df['小计'] = m_df['课时'] * m_df['单价']
+        
+        c1, c2 = st.columns(2)
+        c1.metric("当月总课酬", f"¥{m_df['小计'].sum():,.0f}")
+        c2.metric("当月总课时", f"{m_df['课时'].sum():.1f} h")
+        
+        # 精准汇总 (合并单词和旧数据)
+        def merge_logic(c):
+            if c in ["单词", "旧数据补录", "导入", "大学单词", "雅思单词"]: return "单词课(合并)"
+            return c
+        m_df['统计课型'] = m_df['学习内容'].apply(merge_logic)
+        s_sum = m_df.groupby(['姓名', '统计课型']).agg({'课时': 'sum', '小计': 'sum'}).reset_index()
+        s_order = s_sum.groupby('姓名')['课时'].sum().reset_index().sort_values('课时', ascending=False)
+        final = pd.merge(s_order[['姓名']], s_sum, on='姓名', how='left')
+        final.insert(0, '序号', final['姓名'].map({n: i+1 for i, n in enumerate(s_order['姓名'].unique())}))
+        
+        st.write("---")
+        st.markdown("#### 👤 学生课时汇总 (全屏对账)")
+        st.dataframe(final, use_container_width=True, hide_index=True)
+        
+        st.write("---")
+        st.markdown("#### 🔍 查看学生上课明细")
+        search_name = st.selectbox("选择学生姓名对账", final['姓名'].unique().tolist())
+        if search_name:
+            detail_df = m_df[m_df['姓名'] == search_name].sort_values(by='上课日期', ascending=False)
+            detail_df = detail_df[['上课日期', '学习内容', '课时', '单价', '小计']]
+            st.info(f"学员 **{search_name}** 在 **{target_m}** 的记录：")
+            st.dataframe(detail_df, use_container_width=True, hide_index=True)
+
 elif st.session_state['menu_choice'] == "录入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
-    st.subheader("📝 课时快速录入")
+    st.subheader("📝 课时录入")
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
     if not s_df.empty:
         active_s = sorted(s_df[s_df['状态'] == "在读/上课"]['姓名'].tolist())
         with st.form("input"):
             name = st.selectbox("学员姓名", active_s)
-            date = st.date_input("日期", datetime.date.today())
-            content = st.selectbox("内容", LEARN_CONTENTS)
+            date = st.date_input("上课日期", datetime.date.today())
+            content = st.selectbox("课程内容", LEARN_CONTENTS)
             hour = st.selectbox("时长(h)", options=HOURS_OPTIONS, index=1)
-            if st.form_submit_button("🚀 确认上传"):
+            if st.form_submit_button("🚀 存入飞书云端"):
                 ts = int(datetime.datetime.combine(date, datetime.time()).timestamp() * 1000)
                 add_feishu_record(TABLE_ID_RECORDS, {"姓名": name, "学习日期": ts, "学习内容": content, "课时": hour})
-                st.success("✅ 已同步至飞书")
+                st.success("✅ 同步成功！")
 
 elif st.session_state['menu_choice'] == "名册":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
-    st.subheader("👥 学员信息库")
+    st.subheader("👥 学员库管理")
     with st.expander("➕ 添加学员"):
         with st.form("add"):
             n = st.text_input("姓名"); s = st.selectbox("状态", STATUS_OPTIONS)
-            if st.form_submit_button("确认"):
+            if st.form_submit_button("确认入库"):
                 if n: add_feishu_record(TABLE_ID_STUDENTS, {"姓名": n, "状态": s}); st.rerun()
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
     if not s_df.empty:
         st.dataframe(s_df[["姓名","状态"]], use_container_width=True, hide_index=True)
         t = st.selectbox("🗑️ 删除学员", ["请选择"] + s_df['姓名'].tolist())
-        if t != "请选择" and st.checkbox("确认永久删除该学生"):
-            if st.button("立即删除"):
+        if t != "请选择" and st.checkbox("确认彻底删除"):
+            if st.button("立即执行删除"):
                 rid = s_df[s_df['姓名'] == t]['record_id'].values[0]
                 delete_feishu_record(TABLE_ID_STUDENTS, rid); st.rerun()
 
@@ -254,12 +265,12 @@ elif st.session_state['menu_choice'] == "明细":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
-    st.subheader("📜 历史明细与删除")
+    st.subheader("📜 记录明细")
     all_r = fetch_feishu_data(TABLE_ID_RECORDS)
     if not all_r.empty:
         all_r['日期'] = pd.to_datetime(all_r['学习日期'], unit='ms').dt.strftime('%Y-%m-%d')
         st.dataframe(all_r[["姓名","日期","学习内容","课时"]], use_container_width=True, hide_index=True)
-        t = st.selectbox("🗑️ 选择删除记录", ["请选择"] + (all_r['姓名']+" | "+all_r['日期']+" | "+all_r['学习内容']).tolist())
+        t = st.selectbox("🗑️ 删除单条", ["请选择"] + (all_r['姓名']+" | "+all_r['日期']+" | "+all_r['学习内容']).tolist())
         if t != "请选择" and st.checkbox("确认删除"):
             if st.button("执行删除"):
                 idx = (all_r['姓名']+" | "+all_r['日期']+" | "+all_r['学习内容']).tolist().index(t)
@@ -274,15 +285,15 @@ elif st.session_state['menu_choice'] == "导出":
     if not r_all.empty:
         r_all['dt_obj'] = pd.to_datetime(r_all['学习日期'], unit='ms').dt.date
         target = st.selectbox("选择学生", sorted(r_all['姓名'].unique().tolist()))
-        if st.button("生成 21 天表"):
+        if st.button("生成 21 天 Excel"):
             sub = r_all[r_all['姓名'] == target].sort_values("dt_obj")
-            output = [["21天周期表","",""], [f"姓名：{target}","",""], ["日期","复习","新学","第1天","第2天","第3天","第5天","第7天","第9天","第12天","第14天","第17天","第21天"]]
+            output = [["21天表","",""], [f"姓名：{target}","",""], ["日期","复习","新学","第1天","第2天","第3天","第5天","第7天","第9天","第12天","第14天","第17天","第21天"]]
             for _, row in sub.iterrows():
                 ld = row['dt_obj']
                 rvs = [(ld + datetime.timedelta(days=d-1)).strftime("%Y/%m/%d") for d in REVIEW_DAYS]
                 output.append([ld.strftime("%Y/%m/%d"),"",""] + rvs)
             buf = io.StringIO(); pd.DataFrame(output).to_csv(buf, index=False, header=False, encoding="utf-8-sig")
-            st.download_button(f"📥 下载", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
+            st.download_button(f"📥 下载表格", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
 
 elif st.session_state['menu_choice'] == "导入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
@@ -291,7 +302,7 @@ elif st.session_state['menu_choice'] == "导入":
     f = st.file_uploader("上传 CSV", type="csv")
     if f:
         df = pd.read_csv(f)
-        if st.button("🚀 启动搬家"):
+        if st.button("🚀 启动同步"):
             s_now = fetch_feishu_data(TABLE_ID_STUDENTS); bar = st.progress(0)
             names_in = s_now['姓名'].tolist() if not s_now.empty else []
             for i, row in df.iterrows():
