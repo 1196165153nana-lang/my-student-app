@@ -128,8 +128,9 @@ st.markdown("""
 
     /* 4. 品牌标题样式 */
     .brand-title { text-align: center; color: #4A90E2; font-size: 48px; font-weight: bold; margin-bottom: 0px; }
-    .brand-subtitle { text-align: center; color: #888; font-size: 14px; margin-bottom: 30px; }
-
+    /* 首页的大副标题 */
+  .brand-subtitle { text-align: center; color: #888; font-size: 14px; margin-bottom: 30px; }
+    
     /* 5. 返回按钮样式 */
     .back-btn-box div.stButton > button {
         height: 55px !important; font-size: 16px !important;
@@ -144,8 +145,9 @@ st.markdown("""
 
 # --- 全页面统一标题 ---
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
-st.markdown('<p class="brand-subtitle">🐟 FishTeacher</p>', unsafe_allow_html=True)
+st.markdown('<p class="brand-subtitle  font-size: 20px; margin-bottom: 50px; ">🐟 FishTeacher</p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-subtitle">高效学员管理 & 21天抗遗忘系统</p>', unsafe_allow_html=True)
+
 # -------------------------- 4. 逻辑分发 --------------------------
 
 if st.session_state['undo_cache']:
