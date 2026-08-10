@@ -123,7 +123,7 @@ st.markdown("""
 /* 1 级：主大标题 /
 .brand-title {font-size: 32px;font-weight: bold;text-align: center;margin-bottom: 10px; }
 / 2 级：小标题 /
-.brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px; }
+.brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px; text-align: center;}
 / 3 级：更小的说明文本（新增） */
 .brand-desc {font-size: 10px;color:#666666;text-align: center;margin-bottom: 15px;}
 /* 5. 返回按钮样式 */
