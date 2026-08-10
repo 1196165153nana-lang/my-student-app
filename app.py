@@ -104,7 +104,7 @@ st.markdown("""
 }
  /* 主功能按钮：横向拉长+居中，不再贴左侧 */
     div.stButton > button {
-        width: 400px !important; /* 控制长方形横向长度，调大更宽 */
+        width: 350px !important; /* 控制长方形横向长度，调大更宽 */
         height: 100px !important;
         margin: 0 auto 15px auto !important; /* 水平居中 */
         font-size: 22px !important;
@@ -128,10 +128,26 @@ st.markdown("""
 .brand-desc {font-size: 10px;color:#666666;text-align: center;margin-bottom: 15px;}
 /* 5. 返回按钮样式 */
 .back-btn-box div.stButton > button {
-height: 55px !important; font-size: 16px !important;
+height: 55px !important; font-size: 16px !important; width: 300px !important;
 background-color: transparent !important; border: 1px solid #555 !important;
 justify-content: center !important; padding-left: 0 !important;
 }
+ /* 下拉弹窗每一条选项 */
+    div[data-baseweb="popover"] ul li {
+        min-height: 65px !important;
+        font-size: 22px !important;
+        padding: 12px 20px !important;
+    }
+    div[data-baseweb="popover"] ul {
+        background-color: #1c1e24 !important;
+        border-radius: 16px !important;
+    }
+    div[data-baseweb="popover"] ul li:hover {
+        background-color: #333640 !important;
+    }
+    div[data-baseweb="popover"] ul li[aria-selected="true"] {
+        background-color: #2a3142 !important;
+    }
 /* 隐藏页脚 */
 footer {visibility: hidden;}
 </style>
