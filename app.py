@@ -30,6 +30,7 @@ def get_tenant_access_token():
     except: return None
 
 def fetch_feishu_data(table_id):
+    """从飞书读取数据，保留 record_id 以供删除"""
     token = get_tenant_access_token()
     if not token: return pd.DataFrame()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records?page_size=500"
@@ -37,7 +38,14 @@ def fetch_feishu_data(table_id):
     try:
         r = requests.get(url, headers=headers, timeout=15)
         items = r.json().get("data", {}).get("items", [])
-        return pd.DataFrame([item["fields"] for item in items]) if items else pd.DataFrame()
+        if not items: return pd.DataFrame()
+        
+        data = []
+        for item in items:
+            fields = item["fields"]
+            fields["record_id"] = item["record_id"]  # 关键：获取云端唯一ID
+            data.append(fields)
+        return pd.DataFrame(data)
     except: return pd.DataFrame()
 
 def add_feishu_record(table_id, fields):
@@ -45,6 +53,14 @@ def add_feishu_record(table_id, fields):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     r = requests.post(url, headers=headers, json={"fields": fields})
+    return r.json()
+
+def delete_feishu_record(table_id, record_id):
+    """从飞书云端物理删除一条记录"""
+    token = get_tenant_access_token()
+    url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records/{record_id}"
+    headers = {"Authorization": f"Bearer {token}"}
+    r = requests.delete(url, headers=headers)
     return r.json()
 
 def generate_wechat_msg(name, review_date, learn_dates):
@@ -56,7 +72,12 @@ def generate_wechat_msg(name, review_date, learn_dates):
 # -------------------------- 3. 界面自适应配置 --------------------------
 st.set_page_config(page_title="学生管理云端专业版", layout="centered", page_icon="🎯")
 
-st.markdown("<style>.stButton>button {width: 100%; height: 3.5em; font-size: 18px !important;}</style>", unsafe_allow_html=True)
+st.markdown("""
+    <style>
+    .stButton > button { width: 100%; height: 3em; }
+    .delete-btn > button { background-color: #ff4b4b !important; color: white; }
+    </style>
+    """, unsafe_allow_html=True)
 
 today = datetime.date.today()
 
@@ -117,9 +138,9 @@ elif menu == "📝 录入课时记录":
                     st.balloons()
         else: st.warning("请先在名单管理中添加'在读'学生")
 
-# --- 模块 3：学生名单管理 ---
+# --- 模块 3：学生名单管理 (增加删除学生功能) ---
 elif menu == "👤 学生名单管理":
-    st.subheader("👥 学员库管理")
+    st.subheader("👥 学员信息库管理")
     with st.expander("➕ 添加新学员"):
         with st.form("add_student"):
             n_name = st.text_input("学生姓名")
@@ -129,66 +150,86 @@ elif menu == "👤 学生名单管理":
                     add_feishu_record(TABLE_ID_STUDENTS, {"姓名": n_name, "状态": n_status})
                     st.success(f"✅ {n_name} 已入库")
                     st.rerun()
-    s_view = fetch_feishu_data(TABLE_ID_STUDENTS)
-    if not s_view.empty: st.dataframe(s_view[["姓名", "状态"]], use_container_width=True)
 
-# --- 模块 4：历史数据总表 ---
+    st.write("---")
+    st.write("📋 **当前名册（删除学生请点下方按钮）**")
+    s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
+    if not s_df.empty:
+        st.dataframe(s_df[["姓名", "状态"]], use_container_width=True)
+        
+        # 删除学生逻辑
+        st.write("🗑️ **危险操作：删除学员**")
+        del_name = st.selectbox("选择要从名册删除的学生", ["请选择"] + s_df['姓名'].tolist())
+        if del_name != "请选择":
+            if st.button("❌ 彻底从云端删除该学生"):
+                target_id = s_df[s_df['姓名'] == del_name]['record_id'].values[0]
+                res = delete_feishu_record(TABLE_ID_STUDENTS, target_id)
+                st.success(f"已删除学生：{del_name}")
+                st.rerun()
+    else: st.info("库中无学生。")
+
+# --- 模块 4：历史数据总表 (增加删除课时记录功能) ---
 elif menu == "📊 历史数据总表":
     st.subheader("📊 历史明细 (云端同步)")
     all_r = fetch_feishu_data(TABLE_ID_RECORDS)
     if not all_r.empty:
-        all_r['学习日期'] = pd.to_datetime(all_r['学习日期'], unit='ms', errors='coerce').dt.strftime('%Y-%m-%d')
-        st.dataframe(all_r, use_container_width=True)
+        # 格式化日期显示
+        all_r['显示日期'] = pd.to_datetime(all_r['学习日期'], unit='ms', errors='coerce').dt.strftime('%Y-%m-%d')
+        display_df = all_r[["姓名", "显示日期", "学习内容", "课时", "record_id"]]
+        st.dataframe(display_df.drop(columns=["record_id"]), use_container_width=True)
+        
+        st.write("🗑️ **删除课时记录**")
+        target_del_id = st.selectbox("选择要删除的记录 ID", ["请选择"] + display_df['record_id'].tolist())
+        if target_del_id != "请选择":
+            info = display_df[display_df['record_id'] == target_del_id].iloc[0]
+            st.warning(f"确认删除：{info['姓名']} 在 {info['显示日期']} 的记录吗？")
+            if st.button("🔥 确认删除"):
+                delete_feishu_record(TABLE_ID_RECORDS, target_del_id)
+                st.success("记录已删除")
+                st.rerun()
+    else: st.info("尚无记录")
 
-# --- 模块 5：导出21天表 ---
-elif menu == "📄 导出21天表":
-    st.subheader("📄 单人21天记录表导出")
-    r_all = fetch_feishu_data(TABLE_ID_RECORDS)
-    if not r_all.empty:
-        r_all['dt'] = pd.to_datetime(r_all['学习日期'], unit='ms', errors='coerce').dt.date
-        target = st.selectbox("选择学生", r_all['姓名'].unique())
-        if st.button("生成表格"):
-            sub = r_all[r_all['姓名'] == target].sort_values("dt")
-            output = [["21天抗遗忘周期记录表", "", "", "", "", "", "", "", "", "", "", "", ""], [f"学生姓名：{target}", "", "", "", "", "", "", "", "", "", "", "", ""], ["日期", "复习", "新学", "第1天", "第2天", "第3天", "第5天", "第7天", "第9天", "第12天", "第14天", "第17天", "第21天"]]
-            for _, row in sub.iterrows():
-                ld = row['dt']
-                if pd.isna(ld): continue
-                rvs = [(ld + datetime.timedelta(days=d-1)).strftime("%Y/%m/%d") for d in REVIEW_DAYS]
-                output.append([ld.strftime("%Y/%m/%d"), "", ""] + rvs)
-                output.append([""]*13)
-            buf = io.StringIO()
-            pd.DataFrame(output).to_csv(buf, index=False, header=False, encoding="utf-8-sig")
-            st.download_button(f"📥 下载表格", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
-
-# --- 模块 6：批量导入旧数据 (智能识别版) ---
+# --- 模块 6：批量导入旧数据 (智能识别 + 自动补全名单) ---
 elif menu == "📥 批量导入旧数据":
     st.subheader("📥 批量搬运旧数据到云端")
-    st.info("支持两种格式：\n1. 原始清单表 (含姓名, 学习日期, 课时...)\n2. 统计报表 (含姓名, 08.01, 08.02...)")
+    st.info("智能模式：导入课时时，如果学生不在名单中，会自动帮您创建名单。")
     file = st.file_uploader("点击上传 CSV 文件", type="csv")
     
     if file:
         df = pd.read_csv(file)
         st.write("📄 数据预览：", df.head())
         
-        # 智能识别逻辑
-        is_pivot = any('.' in str(col) for col in df.columns) # 检查是否有 08.01 这种带点的列
+        is_pivot = any('.' in str(col) for col in df.columns) # 识别横向报表
         
-        if st.button("🚀 确认开始同步到飞书"):
+        if st.button("🚀 确认开始同步"):
             bar = st.progress(0)
             count = 0
             
+            # 获取现有学生名单，避免重复创建
+            existing_s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
+            existing_names = existing_s_df['姓名'].tolist() if not existing_s_df.empty else []
+
+            def sync_student_and_record(name, date_ts, val):
+                nonlocal count
+                # 1. 检查并补全学生名单
+                if name not in existing_names:
+                    add_feishu_record(TABLE_ID_STUDENTS, {"姓名": name, "状态": "在读/上课"})
+                    existing_names.append(name) # 内存中更新，防止同批次重复写
+                # 2. 写入课时记录
+                add_feishu_record(TABLE_ID_RECORDS, {"姓名": name, "学习日期": date_ts, "学习内容": "历史导入", "课时": float(val)})
+                count += 1
+
             if not is_pivot:
-                # 格式 1：标准纵向表
+                # 格式 1：清单表
                 for i, row in df.iterrows():
                     try:
                         ld = pd.to_datetime(row['学习日期']).date()
                         ts = int(datetime.datetime.combine(ld, datetime.time()).timestamp() * 1000)
-                        add_feishu_record(TABLE_ID_RECORDS, {"姓名": str(row['姓名']), "学习日期": ts, "学习内容": str(row.get('学习内容','补录')), "课时": float(row.get('课时',1))})
-                        count += 1
+                        sync_student_and_record(str(row['姓名']), ts, row.get('课时', 1))
                         bar.progress((i + 1) / len(df))
                     except: pass
             else:
-                # 格式 2：横向报表 (08.01, 08.02...)
+                # 格式 2：横向报表 (08.01...)
                 date_cols = [c for c in df.columns if '.' in str(c)]
                 total_steps = len(df) * len(date_cols)
                 step = 0
@@ -199,13 +240,11 @@ elif menu == "📥 批量导入旧数据":
                         val = row[d_col]
                         if pd.notna(val) and float(val) > 0:
                             try:
-                                # 报表里的日期是 08.01，补齐为 2026-08-01
                                 date_str = f"2026-{d_col.replace('.', '-')}"
                                 ld = pd.to_datetime(date_str).date()
                                 ts = int(datetime.datetime.combine(ld, datetime.time()).timestamp() * 1000)
-                                add_feishu_record(TABLE_ID_RECORDS, {"姓名": name, "学习日期": ts, "学习内容": "旧数据补录", "课时": float(val)})
-                                count += 1
+                                sync_student_and_record(name, ts, val)
                             except: pass
                         bar.progress(step / total_steps)
             
-            st.success(f"🎊 同步完成！共向飞书存入 {count} 条有效记录。")
+            st.success(f"🎊 搬家完成！同步了 {count} 条记录，并补全了学生名单。")
