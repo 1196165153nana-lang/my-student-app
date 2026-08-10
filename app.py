@@ -5,6 +5,7 @@ import pandas as pd
 import datetime
 import io
 import time
+import random
 
 # -------------------------- 1. 核心安全配置 (从 Secrets 读取) --------------------------
 APP_ID = st.secrets["FEISHU_APP_ID"]
@@ -20,6 +21,8 @@ LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初
 WORD_ONLY_CONTENTS = ["单词", "大学单词", "雅思单词", "旧数据补录", "导入"]
 HOURS_OPTIONS = [float(x)/2 for x in range(1, 21)] # 0.5 到 10.0 小时
 STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业"]
+
+ANIMAL_EMOJIS = ["✅🐱", "✅🐶", "✅🦊", "✅🐼", "✅🐨", "✅🐯", "✅🐰", "✅🦆", "✅🐸", "✅🦁"]
 
 # 初始化状态
 if 'menu_choice' not in st.session_state:
@@ -97,16 +100,18 @@ def generate_wechat_msg(name, review_date, learn_dates):
 # -------------------------- 3. 响应式黄金比例样式 (PC两列, 手机一列) --------------------------
 st.set_page_config(page_title="FishTeacher", layout="centered", page_icon="🐟")
 st.markdown("""
-<style> /* 1. 限制电脑端最大宽度 */ .block-container { max-width: 850px !important; padding-top: 1rem !important; }
+<style> 
+/* 1. 限制电脑端最大宽度 */ 
+.block-container { max-width: 850px !important; padding-top: 1rem !important; }
 /* 2. 响应式列宽：手机端自动变一列并撑满 */
 @media (max-width: 600px) {
 [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
 }
  /* 主功能按钮：横向拉长+居中，不再贴左侧 */
     div.stButton > button {
-        width: 330px !important; /* 控制长方形横向长度，调大更宽 */
+        width: 330px !important;
         height: 100px !important;
-        margin: 0 auto 15px auto !important; /* 水平居中 */
+        margin: 0 auto 15px auto !important;
         font-size: 22px !important;
         font-weight: bold !important;
         color: #FFFFFF !important;
@@ -120,18 +125,21 @@ st.markdown("""
         box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3) !important;
     }
     div.stButton > button:active { background-color: #5289f7 !important; }
-/* 1 级：主大标题 /
+
+/* 1 级：主大标题 */
 .brand-title {font-size: 32px;font-weight: bold;text-align: center;margin-bottom: 10px; }
-/ 2 级：小标题 /
+/* 2 级：小标题 */
 .brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px; text-align: center;}
-/ 3 级：更小的说明文本（新增） */
+/* 3 级：更小的说明文本 */
 .brand-desc {font-size: 10px;color:#666666;text-align: center;margin-bottom: 15px;}
+
 /* 5. 返回按钮样式 */
 .back-btn-box div.stButton > button {
 height: 55px !important; font-size: 16px !important; width: 300px !important;
 background-color: transparent !important; border: 1px solid #555 !important;
 justify-content: center !important; padding-left: 0 !important;
 }
+
  /* 下拉弹窗每一条选项 */
     div[data-baseweb="popover"] ul li {
         min-height: 100px !important;
@@ -148,10 +156,33 @@ justify-content: center !important; padding-left: 0 !important;
     div[data-baseweb="popover"] ul li[aria-selected="true"] {
         background-color: #2a3142 !important;
     }
+
+/* ========== Toast弹窗：屏幕居中，带弹跳动画 ========== */
+div[data-testid="stToast"] {
+    position: fixed !important;
+    top: 45vh !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 360px !important;
+    font-size: 22px !important;
+    font-weight:bold !important;
+    padding:26px !important;
+    border-radius:20px !important;
+    z-index: 9999 !important;
+    animation: toastBounce 0.4s ease-out;
+}
+
+@keyframes toastBounce {
+    0% { transform: translate(-50%, -50%) scale(0.6); opacity:0; }
+    60% { transform: translate(-50%, -50%) scale(1.1); }
+    100% { transform: translate(-50%, -50%) scale(1); opacity:1; }
+}
+
 /* 隐藏页脚 */
 footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
+
 # --- 全页面统一标题---
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
@@ -163,7 +194,9 @@ if st.session_state['undo_cache']:
     if st.sidebar.button("🔙 撤销上次删除", type="primary"):
         add_feishu_record(st.session_state['undo_cache']['table'], st.session_state['undo_cache']['data'])
         st.session_state['undo_cache'] = None
-        st.sidebar.success("已恢复！"); time.sleep(1); st.rerun()
+        emoji = random.choice(ANIMAL_EMOJIS)
+        st.toast(f"{emoji} 已恢复！", icon="✅")
+        time.sleep(1); st.rerun()
 
 def back_home():
     st.session_state['menu_choice'] = "首页"
@@ -258,7 +291,10 @@ elif st.session_state['menu_choice'] == "录入":
             if st.form_submit_button("确认录入"):
                 ts = int(datetime.datetime.combine(date, datetime.time()).timestamp() * 1000)
                 add_feishu_record(TABLE_ID_RECORDS, {"姓名": name, "学习日期": ts, "学习内容": content, "课时": hour})
-                st.success("同步成功")
+                emoji = random.choice(ANIMAL_EMOJIS)
+                st.toast(f"{emoji} 同步成功", icon="✅")
+                time.sleep(1)
+                st.rerun()
 
 # --- 模块：档案 ---
 elif st.session_state['menu_choice'] == "名册":
@@ -270,7 +306,12 @@ elif st.session_state['menu_choice'] == "名册":
         with st.form("add"):
             n = st.text_input("姓名"); s = st.selectbox("状态", STATUS_OPTIONS); info = st.text_area("基础档案信息"); 
             if st.form_submit_button("确认入库"):
-                if n: add_feishu_record(TABLE_ID_STUDENTS, {"姓名": n, "状态": s, "基础信息": info}); st.rerun()
+                if n:
+                    add_feishu_record(TABLE_ID_STUDENTS, {"姓名": n, "状态": s, "基础信息": info})
+                    emoji = random.choice(ANIMAL_EMOJIS)
+                    st.toast(f"{emoji} 学员入库成功", icon="✅")
+                    time.sleep(1)
+                    st.rerun()
     if not s_df.empty:
         ts = st.selectbox("📂 编辑/查看学生档案", ["未选择"] + sorted(s_df['姓名'].tolist()))
         if ts != "未选择":
@@ -280,9 +321,15 @@ elif st.session_state['menu_choice'] == "名册":
                 ni = st.text_area("信息文本框", value=data.get('基础信息', ""), height=200)
                 c1, c2 = st.columns(2)
                 if c1.button("💾 保存档案内容"):
-                    update_feishu_record(TABLE_ID_STUDENTS, data['record_id'], {"状态": ns, "基础信息": ni}); st.success("已更新"); st.rerun()
+                    update_feishu_record(TABLE_ID_STUDENTS, data['record_id'], {"状态": ns, "基础信息": ni})
+                    emoji = random.choice(ANIMAL_EMOJIS)
+                    st.toast(f"{emoji} 档案已更新", icon="✅")
+                    time.sleep(1); st.rerun()
                 if c2.button("🗑️ 彻底删除学生"):
-                    if st.checkbox("确认删除"): delete_feishu_record(TABLE_ID_STUDENTS, data['record_id']); st.rerun()
+                    if st.checkbox("确认删除"):
+                        delete_feishu_record(TABLE_ID_STUDENTS, data['record_id'])
+                        st.toast("⚠️ 学员已删除", icon="⚠️")
+                        time.sleep(1); st.rerun()
 
 # --- 模块：明细、导出、导入 ---
 elif st.session_state['menu_choice'] == "明细":
@@ -298,7 +345,9 @@ elif st.session_state['menu_choice'] == "明细":
             if st.button("执行删除"):
                 idx = (all_r['姓名']+" | "+all_r['日期']).tolist().index(t)
                 st.session_state['undo_cache'] = {"table": TABLE_ID_RECORDS, "data": all_r.iloc[idx].to_dict()}
-                delete_feishu_record(TABLE_ID_RECORDS, all_r.iloc[idx]['record_id']); st.rerun()
+                delete_feishu_record(TABLE_ID_RECORDS, all_r.iloc[idx]['record_id']);
+                st.toast("🗑️ 记录已删除，侧边栏可以撤销", icon="⚠️")
+                time.sleep(1); st.rerun()
 
 elif st.session_state['menu_choice'] == "导出":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
@@ -316,6 +365,8 @@ elif st.session_state['menu_choice'] == "导出":
                 output.append([ld.strftime("%Y/%m/%d"),"",""] + rvs)
             buf = io.StringIO(); pd.DataFrame(output).to_csv(buf, index=False, header=False, encoding="utf-8-sig")
             st.download_button(f"📥 下载", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
+            emoji = random.choice(ANIMAL_EMOJIS)
+            st.toast(f"{emoji} 表格已生成，请下载", icon="✅")
 
 elif st.session_state['menu_choice'] == "导入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
@@ -334,4 +385,7 @@ elif st.session_state['menu_choice'] == "导入":
                     add_feishu_record(TABLE_ID_RECORDS, {"姓名": name, "学习日期": ts, "学习内容": "导入", "课时": float(row.get('课时', 1))})
                 except: pass
                 bar.progress((i+1)/len(df))
-            st.success("完成")
+            emoji = random.choice(ANIMAL_EMOJIS)
+            st.toast(f"{emoji} 批量导入完成", icon="✅")
+            time.sleep(1.2)
+            st.rerun()
