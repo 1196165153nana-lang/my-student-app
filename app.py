@@ -125,13 +125,14 @@ max-width: 1400px !important;
 padding-top: 1rem !important; 
 padding-left:2rem; 
 padding-right:2rem;
-padding-bottom:80px !important;  /*手机底部预留空间，防止按钮被浏览器导航栏遮挡*/
+/* 给悬浮按钮留出底部空间，避免内容被按钮盖住 */
+padding-bottom: 90px !important;
 }
 @media (max-width: 768px) {
 .block-container{
     padding-left:1rem !important;
     padding-right:1rem !important;
-    padding-bottom:100px !important;
+    padding-bottom: calc(100px + env(safe-area-inset-bottom,0px)) !important;
 }
 [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
 }
@@ -153,14 +154,24 @@ div.stButton > button {
 }
 div.stButton > button:active { background-color: #5289f7 !important; }
 
-/*撤销按钮单独样式*/
-.undo-btn-box div.stButton > button{
+/* 悬浮fixed撤销按钮，固定页面底部，无需滚动 */
+.undo-float-wrap {
+    position: fixed !important;
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: min(92%, 460px) !important;
+    z-index: 9998 !important;
+}
+.undo-float-wrap div.stButton > button{
     width:100% !important;
     height:52px !important;
     justify-content:center !important;
     padding-left:0 !important;
     background-color:#1f77b4 !important;
     font-size:17px !important;
+    border-radius:14px !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25) !important;
 }
 
 .brand-title {font-size: 32px;font-weight: bold;text-align: center;margin-bottom: 10px; }
@@ -217,6 +228,13 @@ st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=Tru
 st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-desc">掌上拇指便捷管理</p>', unsafe_allow_html=True)
 
+# -------------------------- 悬浮撤销按钮：全局渲染 --------------------------
+if st.session_state['undo_cache']:
+    st.markdown('<div class="undo-float-wrap">', unsafe_allow_html=True)
+    if st.button("🔙 撤销上次操作", use_container_width=True):
+        do_undo()
+    st.markdown('</div>', unsafe_allow_html=True)
+
 # -------------------------- 4. 逻辑分发 --------------------------
 
 def back_home():
@@ -240,13 +258,6 @@ elif st.session_state['menu_choice'] == "提醒":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
-    # 撤销按钮【放在页面上方，返回按钮下方】
-    if st.session_state['undo_cache']:
-        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
-        if st.button("🔙 撤销上次操作", use_container_width=True):
-            do_undo()
-        st.markdown('</div>',unsafe_allow_html=True)
-        st.divider()
 
     r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     if not r_df.empty:
@@ -273,13 +284,6 @@ elif st.session_state['menu_choice'] == "account":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
-    # 撤销按钮【页面上方】
-    if st.session_state['undo_cache']:
-        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
-        if st.button("🔙 撤销上次操作", use_container_width=True):
-            do_undo()
-        st.markdown('</div>',unsafe_allow_html=True)
-        st.divider()
 
     r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     if r_df.empty:
@@ -361,13 +365,6 @@ elif st.session_state['menu_choice'] == "录入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
-    # 撤销按钮【页面上方】
-    if st.session_state['undo_cache']:
-        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
-        if st.button("🔙 撤销上次操作", use_container_width=True):
-            do_undo()
-        st.markdown('</div>',unsafe_allow_html=True)
-        st.divider()
 
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
     active_s = sorted(s_df[s_df['状态'] == "在读/上课"]['姓名'].tolist())
@@ -413,13 +410,6 @@ elif st.session_state['menu_choice'] == "名册":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
-    # 撤销按钮【页面上方】
-    if st.session_state['undo_cache']:
-        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
-        if st.button("🔙 撤销上次操作", use_container_width=True):
-            do_undo()
-        st.markdown('</div>',unsafe_allow_html=True)
-        st.divider()
 
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
     with st.expander("➕ 添加新学员", expanded=True):
@@ -478,13 +468,6 @@ elif st.session_state['menu_choice'] == "导出":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
-    # 撤销按钮
-    if st.session_state['undo_cache']:
-        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
-        if st.button("🔙 撤销上次操作", use_container_width=True):
-            do_undo()
-        st.markdown('</div>',unsafe_allow_html=True)
-        st.divider()
 
     r_all = fetch_feishu_data(TABLE_ID_RECORDS)
     if not r_all.empty:
@@ -506,13 +489,6 @@ elif st.session_state['menu_choice'] == "导入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
-    #撤销按钮
-    if st.session_state['undo_cache']:
-        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
-        if st.button("🔙 撤销上次操作", use_container_width=True):
-            do_undo()
-        st.markdown('</div>',unsafe_allow_html=True)
-        st.divider()
 
     f = st.file_uploader("上传 CSV", type="csv")
     if f:
