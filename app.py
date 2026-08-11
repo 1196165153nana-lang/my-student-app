@@ -462,6 +462,8 @@ elif st.session_state['menu_choice'] == "名册":
                         delete_feishu_record(TABLE_ID_STUDENTS, data['record_id'])
                         st.toast("⚠️ 学员已删除", icon="⚠️")
                         time.sleep(1); st.rerun()
+    # ✅学生档案页面底部增加撤销按钮
+    render_undo_button()
 
 # --- 模块：导出 ---
 elif st.session_state['menu_choice'] == "导出":
