@@ -508,82 +508,67 @@ elif st.session_state['menu_choice'] == "名册":
         time.sleep(0.8)
         st.rerun()
 
-    # --- 导出21天表模块 ---
-    elif st.session_state['menu_choice'] == "导出":
-        st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
-        if st.button("🏠 返回主菜单"): back_home()
-        st.markdown('</div>', unsafe_allow_html=True)
-        r_all = fetch_feishu_data(TABLE_ID_RECORDS)
-        if not r_all.empty:
-            r_all['dt'] = pd.to_datetime(r_all['学习日期'], unit='ms', errors='coerce').dt.date
-            r_all['month_str'] = pd.to_datetime(r_all['学习日期'], unit='ms', errors='coerce').dt.strftime("%Y-%m")
-    
-            tab1, tab2 = st.tabs(["📄 21天抗遗忘周期表", "📊 本月课时表格(学生×日期)"])
-    
-            with tab1:
-                target = st.selectbox("学员", sorted(r_all['姓名'].unique().tolist()))
-                if st.button("生成21天表格"):
-                    sub = r_all[r_all['姓名'] == target].sort_values("dt")
-                    output = [["21天表","",""], [f"姓名：{target}","",""], ["日期","复习","新学","第1天","第2天","第3天","第5天","第7天","第9天","第12天","第14天","第17天","第21天"]]
-                    for _, row in sub.iterrows():
-                        ld = row['dt']; rvs = [(ld + datetime.timedelta(days=d-1)).strftime("%Y/%m/%d") for d in REVIEW_DAYS]
-                        output.append([ld.strftime("%Y/%m/%d"),"",""] + rvs)
-                    buf = io.StringIO(); pd.DataFrame(output).to_csv(buf, index=False, header=False, encoding="utf-8-sig")
-                    st.download_button(f"📥 下载 {target}_21天表.csv", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
-                    emoji = random.choice(ANIMAL_EMOJIS)
-                    st.toast(f"{emoji} 21天表格已生成，请下载", icon="✅")
-    
-            with tab2:
-                month_list = sorted(r_all["month_str"].unique().tolist(), reverse=True)
-                sel_month = st.selectbox("选择要导出的月份", month_list)
-                month_df = r_all[r_all["month_str"] == sel_month].copy()
-
-            # 构造：学生 -> 短日期 -> 课时
-            from collections import defaultdict
-            stu_date_hour = defaultdict(lambda: defaultdict(float))
-            stu_total = defaultdict(float)
-            date_set = set()
-            stu_set = set()
-
-            for _,row in month_df.iterrows():
-                s_name = row["姓名"]
-                dt_obj = row["dt"]
-                h = float(row["课时"])
-                short_d = dt_obj.strftime("%m.%d")
-                stu_date_hour[s_name][short_d] += h
-                stu_total[s_name] += h
-                date_set.add(short_d)
-                stu_set.add(s_name)
-
-            sorted_stu = sorted(stu_set)
-            # 日期按月、日排序
-            sorted_date = sorted(list(date_set), key=lambda x:(int(x.split(".")[0]), int(x.split(".")[1])))
-
-            # 组装输出DataFrame
-            csv_header = ["姓名","总课时"] + sorted_date
-            out_rows = []
-            for s in sorted_stu:
-                row_data = [s, round(stu_total[s],1)]
-                for d in sorted_date:
-                    row_data.append(round(stu_date_hour[s].get(d,0.0),1))
-                out_rows.append(row_data)
-
-            out_df = pd.DataFrame(out_rows, columns=csv_header)
-            st.dataframe(out_df, use_container_width=True, height=320)
-
-            buf2 = io.StringIO()
-            out_df.to_csv(buf2, index=False, encoding="utf-8-sig")
-            csv_bytes = buf2.getvalue().encode("utf-8-sig")
-            st.download_button(
-                label=f"📥 下载 {sel_month}_课时表格.csv",
-                data=csv_bytes,
-                file_name=f"{sel_month}_课时表格.csv",
-                mime="text/csv"
-            )
-            emoji = random.choice(ANIMAL_EMOJIS)
-            st.toast(f"{emoji} 课时矩阵表格已生成，请下载", icon="✅")
-    else:
+# --- 导出21天表模块【已嵌入：导出本月课时表格（行=学生，列=日期）】---
+elif st.session_state['menu_choice'] == "导出":
+    st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
+    if st.button("🏠 返回主菜单"): back_home()
+    st.markdown('</div>', unsafe_allow_html=True)
+    r_all = fetch_feishu_data(TABLE_ID_RECORDS)
+    if r_all.empty:
         st.info("暂无上课记录，无法导出")
+    else:
+        r_all['dt'] = pd.to_datetime(r_all['学习日期'], unit='ms', errors='coerce').dt.date
+        r_all['ym_str'] = r_all['dt'].apply(lambda x:x.strftime("%Y-%m") if pd.notna(x) else None)
+
+        tab1, tab2 = st.tabs(["📄 导出21天抗遗忘表","📊 导出本月课时表格(行学生，列日期)"])
+
+        with tab1:
+            target = st.selectbox("学员", sorted(r_all['姓名'].unique().tolist()))
+            if st.button("生成21天表格"):
+                sub = r_all[r_all['姓名'] == target].sort_values("dt")
+                output = [["21天表","",""], [f"姓名：{target}","",""], ["日期","复习","新学","第1天","第2天","第3天","第5天","第7天","第9天","第12天","第14天","第17天","第21天"]]
+                for _, row in sub.iterrows():
+                    ld = row['dt']; rvs = [(ld + datetime.timedelta(days=d-1)).strftime("%Y/%m/%d") for d in REVIEW_DAYS]
+                    output.append([ld.strftime("%Y/%m/%d"),"",""] + rvs)
+                buf = io.StringIO(); pd.DataFrame(output).to_csv(buf, index=False, header=False, encoding="utf-8-sig")
+                st.download_button(f"📥 下载 {target}_21天表.csv", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
+                emoji = random.choice(ANIMAL_EMOJIS)
+                st.toast(f"{emoji} 21天表格已生成，请下载", icon="✅")
+
+        with tab2:
+            ym_list = sorted([x for x in r_all['ym_str'].unique() if x is not None], reverse=True)
+            sel_month = st.selectbox("选择要导出的月份", ym_list)
+            if st.button("生成课时矩阵表格"):
+                df_month = r_all[r_all['ym_str'] == sel_month].copy()
+                df_month["date_short"] = df_month["dt"].apply(lambda d:d.strftime("%m.%d"))
+                from collections import defaultdict
+                stu_date_h = defaultdict(lambda:defaultdict(float))
+                stu_total = defaultdict(float)
+                all_dates = set()
+                all_stus = set()
+                for _,row in df_month.iterrows():
+                    sname = row["姓名"]
+                    dshort = row["date_short"]
+                    h = float(row["课时"])
+                    stu_date_h[sname][dshort] += h
+                    stu_total[sname] += h
+                    all_dates.add(dshort)
+                    all_stus.add(sname)
+                sorted_stu = sorted(all_stus)
+                sorted_date = sorted(all_dates, key=lambda x:(int(x.split(".")[0]), int(x.split(".")[1])))
+                csv_rows = []
+                header_row = ["姓名","总课时"] + sorted_date
+                csv_rows.append(header_row)
+                for s in sorted_stu:
+                    row_data = [s, round(stu_total[s],1)]
+                    for d in sorted_date:
+                        row_data.append(round(stu_date_h[s].get(d,0.0),1))
+                    csv_rows.append(row_data)
+                buf2 = io.StringIO()
+                pd.DataFrame(csv_rows).to_csv(buf2, index=False, header=False, encoding="utf-8-sig")
+                st.download_button(f"📥 下载 {sel_month}_课时矩阵表.csv", buf2.getvalue().encode("utf-8-sig"), f"{sel_month}_课时矩阵表.csv", "text/csv")
+                emoji = random.choice(ANIMAL_EMOJIS)
+                st.toast(f"{emoji} 课时矩阵表格已生成，请下载", icon="✅")
 
 # --- 批量导入模块 ---
 elif st.session_state['menu_choice'] == "导入":
