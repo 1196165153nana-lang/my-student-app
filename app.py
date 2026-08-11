@@ -233,7 +233,7 @@ if st.session_state['menu_choice'] == "首页":
         if st.button("👥 学生档案"): st.session_state['menu_choice'] = "名册"; st.rerun()
     with col2:
         if st.button("📝 快速录课"): st.session_state['menu_choice'] = "录入"; st.rerun()
-        if st.button("📄 导出21天"): st.session_state['menu_choice'] = "导出"; st.rerun()
+        if st.button("📄 导出表格"): st.session_state['menu_choice'] = "导出"; st.rerun()
         if st.button("📥 批量数据导入"): st.session_state['menu_choice'] = "导入"; st.rerun()
 
 # --- 复习提醒模块 ---
