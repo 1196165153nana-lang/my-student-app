@@ -20,6 +20,7 @@ LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初
 WORD_ONLY_CONTENTS = ["单词", "旧数据补录", "导入"]
 HOURS_OPTIONS = [float(x)/2 for x in range(1, 21)] # 0.5 到 10.0 小时
 STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业"]
+GRADE_OPTIONS = ["未填写", "小学", "初一", "初二", "初三", "高一", "高二", "高三", "大学", "成人"]
 
 ANIMAL_EMOJIS = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🦆", "🐸", "🦁"]
 
@@ -233,7 +234,7 @@ if st.session_state['menu_choice'] == "首页":
         if st.button("👥 学生档案"): st.session_state['menu_choice'] = "名册"; st.rerun()
     with col2:
         if st.button("📝 快速录课"): st.session_state['menu_choice'] = "录入"; st.rerun()
-        if st.button("📄 导出表格"): st.session_state['menu_choice'] = "导出"; st.rerun()
+        if st.button("📄 导出21天"): st.session_state['menu_choice'] = "导出"; st.rerun()
         if st.button("📥 批量数据导入"): st.session_state['menu_choice'] = "导入"; st.rerun()
 
 # --- 复习提醒模块 ---
@@ -433,7 +434,7 @@ elif st.session_state['menu_choice'] == "录入":
             time.sleep(1)
             st.rerun()
 
-# --- 学生档案模块 ---
+# --- 学生档案模块【新增年级字段】 ---
 elif st.session_state['menu_choice'] == "名册":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -442,6 +443,7 @@ elif st.session_state['menu_choice'] == "名册":
     with st.expander("➕ 添加新学员", expanded=True):
         with st.form("add"):
             n = st.text_input("姓名")
+            grade = st.selectbox("年级", GRADE_OPTIONS)
             s = st.selectbox("状态", STATUS_OPTIONS)
             info = st.text_area("基础档案信息")
             if st.form_submit_button("确认入库"):
@@ -450,7 +452,7 @@ elif st.session_state['menu_choice'] == "名册":
                     if not fresh_student_df.empty and n in fresh_student_df['姓名'].tolist():
                         st.toast(f"⚠️ 学生【{n}】档案已存在，不可重复新建！", icon="⚠️")
                     else:
-                        new_stu_fields = {"姓名": n, "状态": s, "基础信息": info}
+                        new_stu_fields = {"姓名": n, "年级": grade, "状态": s, "基础信息": info}
                         resp = add_feishu_record(TABLE_ID_STUDENTS, new_stu_fields)
                         record_id = resp.get("data",{}).get("record_id")
                         st.session_state["undo_cache"] = {
@@ -468,11 +470,14 @@ elif st.session_state['menu_choice'] == "名册":
         if ts != "未选择":
             data = s_df[s_df['姓名'] == ts].iloc[0]
             with st.container(border=True):
+                current_grade = data.get("年级", "未填写")
+                idx_g = GRADE_OPTIONS.index(current_grade) if current_grade in GRADE_OPTIONS else 0
+                ng = st.selectbox("年级", GRADE_OPTIONS, index=idx_g)
                 ns = st.selectbox("状态", STATUS_OPTIONS, index=STATUS_OPTIONS.index(data['状态']) if data['状态'] in STATUS_OPTIONS else 0)
                 ni = st.text_area("信息文本框", value=data.get('基础信息', ""), height=200)
                 c1, c2 = st.columns(2)
                 if c1.button("💾 保存档案内容"):
-                    update_feishu_record(TABLE_ID_STUDENTS, data['record_id'], {"状态": ns, "基础信息": ni})
+                    update_feishu_record(TABLE_ID_STUDENTS, data['record_id'], {"年级": ng, "状态": ns, "基础信息": ni})
                     emoji = random.choice(ANIMAL_EMOJIS)
                     st.toast(f"{emoji} 档案已更新", icon="✅")
                     time.sleep(1); st.rerun()
@@ -570,7 +575,7 @@ elif st.session_state['menu_choice'] == "导出":
                 emoji = random.choice(ANIMAL_EMOJIS)
                 st.toast(f"{emoji} 课时矩阵表格已生成，请下载", icon="✅")
 
-# --- 批量导入模块 ---
+# --- 批量导入模块【兼容年级列】 ---
 elif st.session_state['menu_choice'] == "导入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -582,7 +587,10 @@ elif st.session_state['menu_choice'] == "导入":
             s_now = fetch_feishu_data(TABLE_ID_STUDENTS); names_in = s_now['姓名'].tolist() if not s_now.empty else []
             for i, row in df.iterrows():
                 name = str(row['姓名'])
-                if name not in names_in: add_feishu_record(TABLE_ID_STUDENTS, {"姓名": name, "状态": "在读/上课"}); names_in.append(name)
+                grade_val = str(row.get("年级","未填写")) if "年级" in df.columns else "未填写"
+                if name not in names_in:
+                    add_feishu_record(TABLE_ID_STUDENTS, {"姓名": name, "年级":grade_val, "状态": "在读/上课"})
+                    names_in.append(name)
                 try:
                     ld = pd.to_datetime(row['学习日期']).date(); ts = int(datetime.datetime.combine(ld, datetime.time()).timestamp() * 1000)
                     add_feishu_record(TABLE_ID_RECORDS, {"姓名": name, "学习日期": ts, "学习内容": "导入", "课时": float(row.get('课时', 1))})
