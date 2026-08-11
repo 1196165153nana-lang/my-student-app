@@ -330,7 +330,7 @@ elif st.session_state['menu_choice'] == "名册":
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
-    with st.expander("➕ 添加新学员"):
+    with st.expander("➕ 添加新学员", expanded=True):
         with st.form("add"):
             n = st.text_input("姓名")
             s = st.selectbox("状态", STATUS_OPTIONS)
