@@ -284,6 +284,7 @@ elif st.session_state['menu_choice'] == "account":
                     target_row = show_df[(show_df["姓名"] == del_student) & (show_df["日期文字"] == del_date)].iloc[0]
                     st.info(f"待删除：{del_student}｜{del_date}｜{target_row['学习内容']}｜{target_row['课时']}h")
 
+            # 原生小型checkbox确认，无大弹窗按钮
             confirm_check = st.checkbox("确认要删除这条记录", disabled=(target_row is None))
             if confirm_check and st.button("执行删除"):
                 st.session_state["undo_cache"] = {"table": TABLE_ID_RECORDS, "data": target_row.to_dict()}
@@ -380,6 +381,7 @@ elif st.session_state['menu_choice'] == "名册":
                     st.toast(f"{emoji} 档案已更新", icon="✅")
                     time.sleep(1); st.rerun()
                 if c2.button("🗑️ 彻底删除学生"):
+                    # 原生小型checkbox确认
                     if st.checkbox("确认删除"):
                         st.session_state["undo_cache"] = {"table": TABLE_ID_STUDENTS, "data": data.to_dict()}
                         delete_feishu_record(TABLE_ID_STUDENTS, data['record_id'])
