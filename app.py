@@ -116,6 +116,15 @@ def do_undo():
     time.sleep(1)
     st.rerun()
 
+# 渲染撤销按钮函数，放在页面底部调用
+def render_undo_button():
+    if st.session_state['undo_cache']:
+        st.divider()
+        st.markdown('<div class="undo-wrap">', unsafe_allow_html=True)
+        if st.button("🔙 撤销上次操作", use_container_width=True):
+            do_undo()
+        st.markdown('</div>', unsafe_allow_html=True)
+
 # -------------------------- 3. 样式 --------------------------
 st.set_page_config(page_title="FishTeacher", layout="wide", page_icon="🐟")
 st.markdown("""
@@ -125,14 +134,12 @@ max-width: 1400px !important;
 padding-top: 1rem !important; 
 padding-left:2rem; 
 padding-right:2rem;
-/* 给悬浮按钮留出底部空间，避免内容被按钮盖住 */
-padding-bottom: 90px !important;
+padding-bottom:40px !important;
 }
 @media (max-width: 768px) {
 .block-container{
     padding-left:1rem !important;
     padding-right:1rem !important;
-    padding-bottom: calc(100px + env(safe-area-inset-bottom,0px)) !important;
 }
 [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
 }
@@ -154,16 +161,12 @@ div.stButton > button {
 }
 div.stButton > button:active { background-color: #5289f7 !important; }
 
-/* 悬浮fixed撤销按钮，固定页面底部，无需滚动 */
-.undo-float-wrap {
-    position: fixed !important;
-    bottom: calc(22px + env(safe-area-inset-bottom, 0px)) !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    width: min(92%, 460px) !important;
-    z-index: 9998 !important;
+/* 页面底部普通撤销按钮，非fixed悬浮 */
+.undo-wrap {
+    width: min(92%,460px);
+    margin:20px auto 10px auto;
 }
-.undo-float-wrap div.stButton > button{
+.undo-wrap div.stButton > button{
     width:100% !important;
     height:52px !important;
     justify-content:center !important;
@@ -227,13 +230,6 @@ footer {visibility: hidden;}
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-desc">掌上拇指便捷管理</p>', unsafe_allow_html=True)
-
-# -------------------------- 悬浮撤销按钮：全局渲染 --------------------------
-if st.session_state['undo_cache']:
-    st.markdown('<div class="undo-float-wrap">', unsafe_allow_html=True)
-    if st.button("🔙 撤销上次操作", use_container_width=True):
-        do_undo()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------------- 4. 逻辑分发 --------------------------
 
@@ -359,6 +355,8 @@ elif st.session_state['menu_choice'] == "account":
                 st.toast("🗑️ 记录已删除，可以撤销", icon="⚠️")
                 time.sleep(1)
                 st.rerun()
+    # ✅账目页面底部渲染撤销按钮
+    render_undo_button()
 
 # --- 模块：快速录课【新增后支持撤销，撤销会删掉刚录入的这节课】---
 elif st.session_state['menu_choice'] == "录入":
@@ -404,6 +402,8 @@ elif st.session_state['menu_choice'] == "录入":
                 st.toast(f"{emoji} 同步成功", icon="✅")
                 time.sleep(1)
                 st.rerun()
+    # ✅快速录课页面底部渲染撤销按钮
+    render_undo_button()
 
 # --- 模块：学生档案【新增学员、删除学员都支持撤销】---
 elif st.session_state['menu_choice'] == "名册":
