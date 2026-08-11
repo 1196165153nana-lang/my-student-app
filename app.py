@@ -120,8 +120,19 @@ def do_undo():
 st.set_page_config(page_title="FishTeacher", layout="wide", page_icon="🐟")
 st.markdown("""
 <style>
-.block-container { max-width: 1400px !important; padding-top: 1rem !important; padding-left:2rem; padding-right:2rem; }
+.block-container { 
+max-width: 1400px !important; 
+padding-top: 1rem !important; 
+padding-left:2rem; 
+padding-right:2rem;
+padding-bottom:80px !important;  /*手机底部预留空间，防止按钮被浏览器导航栏遮挡*/
+}
 @media (max-width: 768px) {
+.block-container{
+    padding-left:1rem !important;
+    padding-right:1rem !important;
+    padding-bottom:100px !important;
+}
 [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
 }
 div.stButton > button {
@@ -141,6 +152,16 @@ div.stButton > button {
     box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3) !important;
 }
 div.stButton > button:active { background-color: #5289f7 !important; }
+
+/*撤销按钮单独样式*/
+.undo-btn-box div.stButton > button{
+    width:100% !important;
+    height:52px !important;
+    justify-content:center !important;
+    padding-left:0 !important;
+    background-color:#1f77b4 !important;
+    font-size:17px !important;
+}
 
 .brand-title {font-size: 32px;font-weight: bold;text-align: center;margin-bottom: 10px; }
 .brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px;}
@@ -219,6 +240,14 @@ elif st.session_state['menu_choice'] == "提醒":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
+    # 撤销按钮【放在页面上方，返回按钮下方】
+    if st.session_state['undo_cache']:
+        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
+        if st.button("🔙 撤销上次操作", use_container_width=True):
+            do_undo()
+        st.markdown('</div>',unsafe_allow_html=True)
+        st.divider()
+
     r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     if not r_df.empty:
         r_df['dt'] = pd.to_datetime(r_df['学习日期'], unit='ms', errors='coerce').dt.date
@@ -244,6 +273,14 @@ elif st.session_state['menu_choice'] == "account":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
+    # 撤销按钮【页面上方】
+    if st.session_state['undo_cache']:
+        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
+        if st.button("🔙 撤销上次操作", use_container_width=True):
+            do_undo()
+        st.markdown('</div>',unsafe_allow_html=True)
+        st.divider()
+
     r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     if r_df.empty:
         st.info("暂无上课记录")
@@ -319,17 +356,19 @@ elif st.session_state['menu_choice'] == "account":
                 time.sleep(1)
                 st.rerun()
 
-            # 撤销按钮
-            if st.session_state['undo_cache']:
-                st.divider()
-                if st.button("🔙 撤销上次操作", type="primary"):
-                    do_undo()
-
 # --- 模块：快速录课【新增后支持撤销，撤销会删掉刚录入的这节课】---
 elif st.session_state['menu_choice'] == "录入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
+    # 撤销按钮【页面上方】
+    if st.session_state['undo_cache']:
+        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
+        if st.button("🔙 撤销上次操作", use_container_width=True):
+            do_undo()
+        st.markdown('</div>',unsafe_allow_html=True)
+        st.divider()
+
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
     active_s = sorted(s_df[s_df['状态'] == "在读/上课"]['姓名'].tolist())
 
@@ -368,17 +407,20 @@ elif st.session_state['menu_choice'] == "录入":
                 st.toast(f"{emoji} 同步成功", icon="✅")
                 time.sleep(1)
                 st.rerun()
-    # 本页面撤销按钮
-    if st.session_state['undo_cache']:
-        st.divider()
-        if st.button("🔙 撤销上次操作", type="primary"):
-            do_undo()
 
 # --- 模块：学生档案【新增学员、删除学员都支持撤销】---
 elif st.session_state['menu_choice'] == "名册":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
+    # 撤销按钮【页面上方】
+    if st.session_state['undo_cache']:
+        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
+        if st.button("🔙 撤销上次操作", use_container_width=True):
+            do_undo()
+        st.markdown('</div>',unsafe_allow_html=True)
+        st.divider()
+
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
     with st.expander("➕ 添加新学员", expanded=True):
         with st.form("add"):
@@ -430,17 +472,20 @@ elif st.session_state['menu_choice'] == "名册":
                         delete_feishu_record(TABLE_ID_STUDENTS, data['record_id'])
                         st.toast("⚠️ 学员已删除", icon="⚠️")
                         time.sleep(1); st.rerun()
-    # 本页面撤销按钮
-    if st.session_state['undo_cache']:
-        st.divider()
-        if st.button("🔙 撤销上次操作", type="primary"):
-            do_undo()
 
 # --- 模块：导出 ---
 elif st.session_state['menu_choice'] == "导出":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
+    # 撤销按钮
+    if st.session_state['undo_cache']:
+        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
+        if st.button("🔙 撤销上次操作", use_container_width=True):
+            do_undo()
+        st.markdown('</div>',unsafe_allow_html=True)
+        st.divider()
+
     r_all = fetch_feishu_data(TABLE_ID_RECORDS)
     if not r_all.empty:
         r_all['dt'] = pd.to_datetime(r_all['学习日期'], unit='ms', errors='coerce').dt.date
@@ -461,6 +506,14 @@ elif st.session_state['menu_choice'] == "导入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
+    #撤销按钮
+    if st.session_state['undo_cache']:
+        st.markdown('<div class="undo-btn-box">',unsafe_allow_html=True)
+        if st.button("🔙 撤销上次操作", use_container_width=True):
+            do_undo()
+        st.markdown('</div>',unsafe_allow_html=True)
+        st.divider()
+
     f = st.file_uploader("上传 CSV", type="csv")
     if f:
         df = pd.read_csv(f); bar = st.progress(0)
