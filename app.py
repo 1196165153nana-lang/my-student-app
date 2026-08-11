@@ -362,7 +362,7 @@ elif st.session_state['menu_choice'] == "account":
             time.sleep(0.8)
             st.rerun()
 
-# --- 模块：录入【修复表单rerun清空复选框】---
+# --- 模块：录入【去掉录入撤销，新增删除上课记录】---
 elif st.session_state['menu_choice'] == "录入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -394,40 +394,45 @@ elif st.session_state['menu_choice'] == "录入":
                 resp = add_feishu_record(TABLE_ID_RECORDS, new_fields)
                 record_id = resp.get("data",{}).get("record_id")
                 if not record_id:
-                    st.toast(f"❌ 录入失败，未获取记录ID，无法撤销！{resp}", icon="❌")
+                    st.toast(f"❌ 录入失败，未获取记录ID！{resp}", icon="❌")
                 else:
-                    st.session_state["undo_cache"] = {
-                        "action":"add",
-                        "table_id":TABLE_ID_RECORDS,
-                        "record_id": record_id,
-                        "origin_fields": new_fields
-                    }
+                    # 快速录课：不再写入undo_cache，不可撤销
                     emoji = random.choice(ANIMAL_EMOJIS)
-                    st.toast(f"{emoji} 同步成功，下滑执行撤销", icon="✅")
+                    st.toast(f"{emoji} 同步成功", icon="✅")
                     time.sleep(1)
                     st.rerun()
 
-    # ========= 录入页面撤销区域（放在form表单外面！！！） =========
+    # =========【快速录课页面新增：删除上课记录功能】==========
     st.divider()
-    st.subheader("↩️ 撤销上一步操作")
-    cache_exist = isinstance(st.session_state.get("undo_cache"), dict)
-    if cache_exist:
-        st.success(f"✅ 当前可撤销：{st.session_state['undo_cache']['action']}")
+    st.subheader("🗑️ 删除上课记录")
+    r_df_del = fetch_feishu_data(TABLE_ID_RECORDS)
+    if r_df_del.empty:
+        st.info("暂无上课记录")
     else:
-        st.warning("⚠️ 暂无待撤销操作")
+        r_df_del['dt_obj'] = pd.to_datetime(r_df_del['学习日期'], unit='ms', errors='coerce')
+        r_df_del['日期文字'] = r_df_del['dt_obj'].dt.strftime('%Y-%m-%d')
+        target_row_del = None
+        del_stu = st.selectbox("1.选择学生", ["请选择学生"] + sorted(r_df_del['姓名'].unique().tolist()), key="del_in_stu")
+        if del_stu != "请选择学生":
+            stu_rec = r_df_del[r_df_del["姓名"] == del_stu].sort_values("日期文字", ascending=False)
+            date_opt = stu_rec["日期文字"].tolist()
+            del_dt = st.selectbox("2.选择上课日期", ["请选择日期"] + date_opt, key="del_in_date")
+            if del_dt != "请选择日期":
+                target_row_del = r_df_del[(r_df_del["姓名"] == del_stu) & (r_df_del["日期文字"] == del_dt)].iloc[0]
+                st.info(f"待删除：{del_stu}｜{del_dt}｜{target_row_del['学习内容']}｜{target_row_del['课时']}h")
 
-    chk_undo_enable = st.checkbox("启用撤销操作", disabled=not cache_exist, key="chk_undo_enable_in")
-    chk_undo_confirm = st.checkbox("确认执行撤销", disabled=not chk_undo_enable, key="chk_undo_confirm_in")
-
-    if st.button("✅ 执行撤销", disabled= not (chk_undo_enable and chk_undo_confirm)):
-        ok, msg = execute_undo()
-        if ok:
-            st.toast(f"✅ {msg}", icon="✅")
-        else:
-            st.toast(f"❌ {msg}", icon="❌")
-        st.session_state["undo_cache"] = None
-        time.sleep(0.8)
-        st.rerun()
+        confirm_del_check = st.checkbox("确认删除本条上课记录", disabled=(target_row_del is None), key="chk_del_in")
+        if confirm_del_check and st.button("执行删除", key="btn_del_in"):
+            st.session_state["undo_cache"] = {
+                "action":"delete",
+                "table_id":TABLE_ID_RECORDS,
+                "record_id":target_row_del["record_id"],
+                "origin_fields": target_row_del.to_dict()
+            }
+            delete_feishu_record(TABLE_ID_RECORDS, target_row_del["record_id"])
+            st.toast("🗑️ 记录已删除，前往账目页面执行撤销", icon="⚠️")
+            time.sleep(1)
+            st.rerun()
 
 # --- 模块：档案【修复：禁止新增同名学生】---
 elif st.session_state['menu_choice'] == "名册":
