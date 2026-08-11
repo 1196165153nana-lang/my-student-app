@@ -276,18 +276,32 @@ elif st.session_state['menu_choice'] == "account":
                 st.dataframe(detail[['日期文字', '学习内容', '课时', '小计']], use_container_width=True, hide_index=True)
 
         with col_log:
-            st.subheader("📜 全部流水记录（可删除）")
-            show_df = r_df.copy()
-            st.dataframe(show_df[["姓名","日期文字","学习内容","课时"]], use_container_width=True, hide_index=True, height=480)
+    st.subheader("📜 全部流水记录（可删除）")
+    show_df = r_df.copy()
+    st.dataframe(show_df[["姓名","日期文字","学习内容","课时"]], use_container_width=True, hide_index=True, height=480)
 
-            t = st.selectbox("🗑️ 删除记录", ["请选择"] + (show_df['姓名']+" | "+show_df['日期文字']).tolist())
-            if t != "请选择" and st.checkbox("确认"):
-                if st.button("执行删除"):
-                    idx = (show_df['姓名']+" | "+show_df['日期文字']).tolist().index(t)
-                    st.session_state['undo_cache'] = {"table": TABLE_ID_RECORDS, "data": show_df.iloc[idx].to_dict()}
-                    delete_feishu_record(TABLE_ID_RECORDS, show_df.iloc[idx]['record_id']);
-                    st.toast("🗑️ 记录已删除，侧边栏可以撤销", icon="⚠️")
-                    time.sleep(1); st.rerun()
+    st.divider()
+    st.subheader("🗑️ 删除上课记录")
+    # 第一步：选择学生
+    del_student = st.selectbox("1. 选择学生", ["请选择学生"] + sorted(show_df['姓名'].unique().tolist()))
+    target_row = None
+    if del_student != "请选择学生":
+        # 筛选该学生全部上课记录，提取日期列表
+        student_records = show_df[show_df['姓名'] == del_student].sort_values("日期文字", ascending=False)
+        date_list = student_records['日期文字'].tolist()
+        del_date = st.selectbox("2. 选择上课日期", ["请选择日期"] + date_list)
+        if del_date != "请选择日期":
+            # 匹配唯一行数据
+            target_row = show_df[(show_df['姓名'] == del_student) & (show_df['日期文字'] == del_date)].iloc[0]
+            st.info(f"待删除记录：{del_student} | {del_date} | {target_row['学习内容']} | {target_row['课时']}h")
+    
+    confirm_del = st.checkbox("确认要删除这条记录", disabled=(target_row is None))
+    if confirm_del and st.button("执行删除", type="secondary"):
+        # 缓存用于撤销
+        st.session_state['undo_cache'] = {"table": TABLE_ID_RECORDS, "data": target_row.to_dict()}
+        delete_feishu_record(TABLE_ID_RECORDS, target_row['record_id'])
+        st.toast("🗑️ 记录已删除，侧边栏可以撤销", icon="⚠️")
+        time.sleep(1); st.rerun()
 
 # --- 模块：录入【修复：提交时实时拉取飞书数据做重复校验】---
 elif st.session_state['menu_choice'] == "录入":
