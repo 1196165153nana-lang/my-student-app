@@ -341,10 +341,14 @@ elif st.session_state['menu_choice'] == "account":
                 time.sleep(1)
                 st.rerun()
 
-        # =========【修复撤销区域：两个复选框仅做UI，按钮真正执行撤销】==========
+        # =========【撤销区域】==========
         st.divider()
         st.subheader("↩️ 撤销上一步操作")
         cache_exist = isinstance(st.session_state.get("undo_cache"), dict)
+        if cache_exist:
+            st.success(f"✅ 存在待撤销操作：{st.session_state['undo_cache']['action']}")
+        else:
+            st.warning("⚠️ 无待撤销缓存")
         chk_undo_enable = st.checkbox("启用撤销操作", disabled=not cache_exist, key="chk_undo_enable_acc")
         chk_undo_confirm = st.checkbox("确认执行撤销", disabled=not chk_undo_enable, key="chk_undo_confirm_acc")
 
@@ -358,7 +362,7 @@ elif st.session_state['menu_choice'] == "account":
             time.sleep(0.8)
             st.rerun()
 
-# --- 模块：录入【修复：提交时实时拉取飞书数据做重复校验】---
+# --- 模块：录入【修复表单rerun清空复选框】---
 elif st.session_state['menu_choice'] == "录入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -389,21 +393,29 @@ elif st.session_state['menu_choice'] == "录入":
                 new_fields = {"姓名": name, "学习日期": ts, "学习内容": content, "课时": hour}
                 resp = add_feishu_record(TABLE_ID_RECORDS, new_fields)
                 record_id = resp.get("data",{}).get("record_id")
-                st.session_state["undo_cache"] = {
-                    "action":"add",
-                    "table_id":TABLE_ID_RECORDS,
-                    "record_id": record_id,
-                    "origin_fields": new_fields
-                }
-                emoji = random.choice(ANIMAL_EMOJIS)
-                st.toast(f"{emoji} 同步成功，下方可执行撤销", icon="✅")
-                time.sleep(1)
-                st.rerun()
+                if not record_id:
+                    st.toast(f"❌ 录入失败，未获取记录ID，无法撤销！{resp}", icon="❌")
+                else:
+                    st.session_state["undo_cache"] = {
+                        "action":"add",
+                        "table_id":TABLE_ID_RECORDS,
+                        "record_id": record_id,
+                        "origin_fields": new_fields
+                    }
+                    emoji = random.choice(ANIMAL_EMOJIS)
+                    st.toast(f"{emoji} 同步成功，下滑执行撤销", icon="✅")
+                    time.sleep(1)
+                    st.rerun()
 
-    # ========= 录入页面撤销区域 =========
+    # ========= 录入页面撤销区域（放在form表单外面！！！） =========
     st.divider()
     st.subheader("↩️ 撤销上一步操作")
     cache_exist = isinstance(st.session_state.get("undo_cache"), dict)
+    if cache_exist:
+        st.success(f"✅ 当前可撤销：{st.session_state['undo_cache']['action']}")
+    else:
+        st.warning("⚠️ 暂无待撤销操作")
+
     chk_undo_enable = st.checkbox("启用撤销操作", disabled=not cache_exist, key="chk_undo_enable_in")
     chk_undo_confirm = st.checkbox("确认执行撤销", disabled=not chk_undo_enable, key="chk_undo_confirm_in")
 
@@ -476,6 +488,10 @@ elif st.session_state['menu_choice'] == "名册":
     st.divider()
     st.subheader("↩️ 撤销上一步操作")
     cache_exist = isinstance(st.session_state.get("undo_cache"), dict)
+    if cache_exist:
+        st.success(f"✅ 当前可撤销：{st.session_state['undo_cache']['action']}")
+    else:
+        st.warning("⚠️ 暂无待撤销操作")
     chk_undo_enable = st.checkbox("启用撤销操作", disabled=not cache_exist, key="chk_undo_enable_stu")
     chk_undo_confirm = st.checkbox("确认执行撤销", disabled=not chk_undo_enable, key="chk_undo_confirm_stu")
 
