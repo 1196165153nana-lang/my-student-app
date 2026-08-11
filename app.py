@@ -289,28 +289,29 @@ elif st.session_state['menu_choice'] == "account":
                     st.toast("🗑️ 记录已删除，侧边栏可以撤销", icon="⚠️")
                     time.sleep(1); st.rerun()
 
-# --- 模块：录入【保留同一天同一学生重复过滤】---
+# --- 模块：录入【修复：提交时实时拉取飞书数据做重复校验】---
 elif st.session_state['menu_choice'] == "录入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
-    record_df = fetch_feishu_data(TABLE_ID_RECORDS)
-
     active_s = sorted(s_df[s_df['状态'] == "在读/上课"]['姓名'].tolist())
+
     with st.form("in"):
         name = st.selectbox("学生姓名", active_s)
         date = st.date_input("上课日期")
         content = st.selectbox("内容", LEARN_CONTENTS)
         hour = st.selectbox("课时", HOURS_OPTIONS, index=1)
-
         submit = st.form_submit_button("确认录入")
+
         if submit:
+            # 提交瞬间实时拉取最新记录，不用页面缓存
+            real_time_record_df = fetch_feishu_data(TABLE_ID_RECORDS)
             duplicate = False
-            if not record_df.empty:
-                record_df["parse_date"] = pd.to_datetime(record_df["学习日期"], unit="ms", errors="coerce").dt.date
-                filter_cond = (record_df["姓名"] == name) & (record_df["parse_date"] == date)
-                if record_df[filter_cond].shape[0] > 0:
+            if not real_time_record_df.empty:
+                real_time_record_df["parse_date"] = pd.to_datetime(real_time_record_df["学习日期"], unit="ms", errors="coerce").dt.date
+                filter_cond = (real_time_record_df["姓名"] == name) & (real_time_record_df["parse_date"] == date)
+                if real_time_record_df[filter_cond].shape[0] > 0:
                     duplicate = True
 
             if duplicate:
@@ -323,7 +324,7 @@ elif st.session_state['menu_choice'] == "录入":
                 time.sleep(1)
                 st.rerun()
 
-# --- 模块：档案 ---
+# --- 模块：档案【修复：禁止新增同名学生】---
 elif st.session_state['menu_choice'] == "名册":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -331,14 +332,21 @@ elif st.session_state['menu_choice'] == "名册":
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
     with st.expander("➕ 添加新学员"):
         with st.form("add"):
-            n = st.text_input("姓名"); s = st.selectbox("状态", STATUS_OPTIONS); info = st.text_area("基础档案信息");
+            n = st.text_input("姓名")
+            s = st.selectbox("状态", STATUS_OPTIONS)
+            info = st.text_area("基础档案信息")
             if st.form_submit_button("确认入库"):
                 if n:
-                    add_feishu_record(TABLE_ID_STUDENTS, {"姓名": n, "状态": s, "基础信息": info})
-                    emoji = random.choice(ANIMAL_EMOJIS)
-                    st.toast(f"{emoji} 学员入库成功", icon="✅")
-                    time.sleep(1)
-                    st.rerun()
+                    # 实时拉取学生表，判断是否已经存在同名
+                    fresh_student_df = fetch_feishu_data(TABLE_ID_STUDENTS)
+                    if not fresh_student_df.empty and n in fresh_student_df['姓名'].tolist():
+                        st.toast(f"⚠️ 学生【{n}】档案已存在，不可重复新建！", icon="⚠️")
+                    else:
+                        add_feishu_record(TABLE_ID_STUDENTS, {"姓名": n, "状态": s, "基础信息": info})
+                        emoji = random.choice(ANIMAL_EMOJIS)
+                        st.toast(f"{emoji} 学员入库成功", icon="✅")
+                        time.sleep(1)
+                        st.rerun()
     if not s_df.empty:
         ts = st.selectbox("📂 编辑/查看学生档案", ["未选择"] + sorted(s_df['姓名'].tolist()))
         if ts != "未选择":
