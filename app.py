@@ -23,20 +23,21 @@ STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业"]
 
 ANIMAL_EMOJIS = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🦆", "🐸", "🦁"]
 
-# 初始化状态，加固防止KeyError
+# 初始化状态
 if 'menu_choice' not in st.session_state:
     st.session_state['menu_choice'] = "首页"
-if "undo_cache" not in st.session_state or not isinstance(st.session_state["undo_cache"], (dict, type(None))):
+if "undo_cache" not in st.session_state:
     st.session_state["undo_cache"] = None
 
 # -------------------------- 2. 核心工具函数 --------------------------
-
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     try:
         r = requests.post(url, json={"app_id": APP_ID, "app_secret": APP_SECRET}, timeout=10)
         return r.json().get("tenant_access_token")
-    except: return None
+    except Exception as e:
+        print(f"获取token失败:{e}")
+        return None
 
 def fetch_feishu_data(table_id):
     token = get_tenant_access_token()
@@ -53,7 +54,9 @@ def fetch_feishu_data(table_id):
             f["record_id"] = item["record_id"]
             data.append(f)
         return pd.DataFrame(data)
-    except: return pd.DataFrame()
+    except Exception as e:
+        print(f"拉取数据异常:{e}")
+        return pd.DataFrame()
 
 def add_feishu_record(table_id, fields):
     token = get_tenant_access_token()
@@ -61,17 +64,22 @@ def add_feishu_record(table_id, fields):
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     forbidden = ["record_id", "显示日期", "标签", "小计", "单价", "分类", "dt", "月份", "学习日期_dt", "dt_obj", "统计课型", "序号", "总课时(h)", "上课日期", "日期文字"]
     clean_f = {k: v for k, v in fields.items() if k not in forbidden}
+    payload = {"fields": clean_f}
     try:
-        r = requests.post(url, headers=headers, json={"fields": clean_f})
-        return r.json()
-    except: return {"code": -1}
+        r = requests.post(url, headers=headers, json=payload, timeout=12)
+        resp = r.json()
+        print(f"add_resp:{resp}")
+        return resp
+    except Exception as e:
+        print(f"新增记录异常:{e}")
+        return {"code": -1}
 
 def update_feishu_record(table_id, record_id, fields):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records/{record_id}"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
-        r = requests.put(url, headers=headers, json={"fields": fields})
+        r = requests.put(url, headers=headers, json={"fields": fields}, timeout=12)
         return r.json()
     except: return {"code": -1}
 
@@ -80,9 +88,13 @@ def delete_feishu_record(table_id, record_id):
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records/{record_id}"
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        r = requests.delete(url, headers=headers)
-        return r.json()
-    except: return {"code": -1}
+        r = requests.delete(url, headers=headers, timeout=12)
+        resp = r.json()
+        print(f"delete resp:{resp}")
+        return resp
+    except Exception as e:
+        print(f"删除异常:{e}")
+        return {"code":-1}
 
 def get_unit_price(content):
     if content in ["初中阅读", "初中语法"]: return 45
@@ -95,24 +107,37 @@ def generate_wechat_msg(name, review_date, learn_dates):
     ln_dates_str = "\n".join([datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%m月%d日单词学习内容") for d in sorted_ln])
     return f"【21天抗遗忘单词复习提醒】\n\n{rv_date_str}复习内容为：\n\n{ln_dates_str}\n\n请{name}同学抽出时间复习 巩固单词印象 加油哦💪期待下次的课堂哦"
 
+# --------------------------【修复后的撤销函数】--------------------------
 def execute_undo():
-    """执行撤销逻辑，返回True代表成功撤销"""
     cache = st.session_state.get("undo_cache")
     if not (isinstance(cache, dict) and "action" in cache):
-        return False
+        return False, "无缓存操作"
     action = cache["action"]
     table_id = cache["table_id"]
     record_id = cache.get("record_id")
     origin_fields = cache.get("origin_fields")
+
+    forbidden_undo_keys = ["record_id","dt_obj","月份","日期文字","小计","单价","统计课型","序号"]
+    if origin_fields:
+        origin_fields = {k:v for k,v in origin_fields.items() if k not in forbidden_undo_keys}
+
     if action == "add":
-        if record_id:
-            delete_feishu_record(table_id, record_id)
-            return True
+        if not record_id:
+            return False, "add操作无record_id"
+        res = delete_feishu_record(table_id, record_id)
+        if res.get("code") ==0:
+            return True, "撤销新增成功，已删除记录"
+        else:
+            return False, f"删除失败:{res}"
     elif action == "delete":
-        if origin_fields:
-            add_feishu_record(table_id, origin_fields)
-            return True
-    return False
+        if not origin_fields:
+            return False, "delete操作缺少原始字段"
+        res = add_feishu_record(table_id, origin_fields)
+        if res.get("code") ==0:
+            return True, "撤销删除成功，已恢复记录"
+        else:
+            return False, f"恢复新增失败:{res}"
+    return False, "未知操作类型"
 
 # -------------------------- 3. 样式 --------------------------
 st.set_page_config(page_title="FishTeacher", layout="wide", page_icon="🐟")
@@ -294,7 +319,6 @@ elif st.session_state['menu_choice'] == "account":
             st.divider()
             st.subheader("🗑️ 删除上课记录")
             target_row = None
-            # 第一级：选学生
             del_student = st.selectbox("1.选择学生", ["请选择学生"] + sorted(show_df['姓名'].unique().tolist()))
             if del_student != "请选择学生":
                 student_records = show_df[show_df["姓名"] == del_student].sort_values("日期文字", ascending=False)
@@ -306,7 +330,6 @@ elif st.session_state['menu_choice'] == "account":
 
             confirm_check = st.checkbox("确认要删除这条记录", disabled=(target_row is None))
             if confirm_check and st.button("执行删除"):
-                # 删除前写入undo_cache
                 st.session_state["undo_cache"] = {
                     "action":"delete",
                     "table_id":TABLE_ID_RECORDS,
@@ -318,18 +341,19 @@ elif st.session_state['menu_choice'] == "account":
                 time.sleep(1)
                 st.rerun()
 
-        # ========= 当前页面撤销区域：两个复选框 =========
+        # =========【修复撤销区域：两个复选框仅做UI，按钮真正执行撤销】==========
         st.divider()
         st.subheader("↩️ 撤销上一步操作")
         cache_exist = isinstance(st.session_state.get("undo_cache"), dict)
-        chk_undo_enable = st.checkbox("启用撤销操作", disabled=not cache_exist)
-        chk_undo_confirm = st.checkbox("确认执行撤销", disabled=not chk_undo_enable)
-        if chk_undo_enable and chk_undo_confirm and st.button("✅ 执行撤销"):
-            ok = execute_undo()
+        chk_undo_enable = st.checkbox("启用撤销操作", disabled=not cache_exist, key="chk_undo_enable_acc")
+        chk_undo_confirm = st.checkbox("确认执行撤销", disabled=not chk_undo_enable, key="chk_undo_confirm_acc")
+
+        if st.button("✅ 执行撤销", disabled= not (chk_undo_enable and chk_undo_confirm)):
+            ok, msg = execute_undo()
             if ok:
-                st.toast("✅ 撤销完成", icon="✅")
+                st.toast(f"✅ {msg}", icon="✅")
             else:
-                st.toast("❌ 没有可撤销数据", icon="❌")
+                st.toast(f"❌ {msg}", icon="❌")
             st.session_state["undo_cache"] = None
             time.sleep(0.8)
             st.rerun()
@@ -350,7 +374,6 @@ elif st.session_state['menu_choice'] == "录入":
         submit = st.form_submit_button("确认录入")
 
         if submit:
-            # 提交瞬间实时拉取最新记录，不用页面缓存
             real_time_record_df = fetch_feishu_data(TABLE_ID_RECORDS)
             duplicate = False
             if not real_time_record_df.empty:
@@ -366,7 +389,6 @@ elif st.session_state['menu_choice'] == "录入":
                 new_fields = {"姓名": name, "学习日期": ts, "学习内容": content, "课时": hour}
                 resp = add_feishu_record(TABLE_ID_RECORDS, new_fields)
                 record_id = resp.get("data",{}).get("record_id")
-                # 新增录课成功写入undo_cache
                 st.session_state["undo_cache"] = {
                     "action":"add",
                     "table_id":TABLE_ID_RECORDS,
@@ -378,18 +400,19 @@ elif st.session_state['menu_choice'] == "录入":
                 time.sleep(1)
                 st.rerun()
 
-    # ========= 当前页面撤销区域：两个复选框 =========
+    # ========= 录入页面撤销区域 =========
     st.divider()
     st.subheader("↩️ 撤销上一步操作")
     cache_exist = isinstance(st.session_state.get("undo_cache"), dict)
-    chk_undo_enable = st.checkbox("启用撤销操作", disabled=not cache_exist)
-    chk_undo_confirm = st.checkbox("确认执行撤销", disabled=not chk_undo_enable)
-    if chk_undo_enable and chk_undo_confirm and st.button("✅ 执行撤销"):
-        ok = execute_undo()
+    chk_undo_enable = st.checkbox("启用撤销操作", disabled=not cache_exist, key="chk_undo_enable_in")
+    chk_undo_confirm = st.checkbox("确认执行撤销", disabled=not chk_undo_enable, key="chk_undo_confirm_in")
+
+    if st.button("✅ 执行撤销", disabled= not (chk_undo_enable and chk_undo_confirm)):
+        ok, msg = execute_undo()
         if ok:
-            st.toast("✅ 撤销完成", icon="✅")
+            st.toast(f"✅ {msg}", icon="✅")
         else:
-            st.toast("❌ 没有可撤销数据", icon="❌")
+            st.toast(f"❌ {msg}", icon="❌")
         st.session_state["undo_cache"] = None
         time.sleep(0.8)
         st.rerun()
@@ -407,7 +430,6 @@ elif st.session_state['menu_choice'] == "名册":
             info = st.text_area("基础档案信息")
             if st.form_submit_button("确认入库"):
                 if n:
-                    # 实时拉取学生表，判断是否已经存在同名
                     fresh_student_df = fetch_feishu_data(TABLE_ID_STUDENTS)
                     if not fresh_student_df.empty and n in fresh_student_df['姓名'].tolist():
                         st.toast(f"⚠️ 学生【{n}】档案已存在，不可重复新建！", icon="⚠️")
@@ -415,7 +437,6 @@ elif st.session_state['menu_choice'] == "名册":
                         new_stu_fields = {"姓名": n, "状态": s, "基础信息": info}
                         resp = add_feishu_record(TABLE_ID_STUDENTS, new_stu_fields)
                         record_id = resp.get("data",{}).get("record_id")
-                        # 新增学生写入undo_cache
                         st.session_state["undo_cache"] = {
                             "action":"add",
                             "table_id":TABLE_ID_STUDENTS,
@@ -441,7 +462,6 @@ elif st.session_state['menu_choice'] == "名册":
                     time.sleep(1); st.rerun()
                 if c2.button("🗑️ 彻底删除学生"):
                     if st.checkbox("确认删除"):
-                        # 删除学生档案写入undo_cache
                         st.session_state["undo_cache"] = {
                             "action":"delete",
                             "table_id":TABLE_ID_STUDENTS,
@@ -452,18 +472,19 @@ elif st.session_state['menu_choice'] == "名册":
                         st.toast("⚠️ 学员已删除，下方可执行撤销", icon="⚠️")
                         time.sleep(1); st.rerun()
 
-    # ========= 当前页面撤销区域：两个复选框 =========
+    # ========= 名册页面撤销区域 =========
     st.divider()
     st.subheader("↩️ 撤销上一步操作")
     cache_exist = isinstance(st.session_state.get("undo_cache"), dict)
-    chk_undo_enable = st.checkbox("启用撤销操作", disabled=not cache_exist)
-    chk_undo_confirm = st.checkbox("确认执行撤销", disabled=not chk_undo_enable)
-    if chk_undo_enable and chk_undo_confirm and st.button("✅ 执行撤销"):
-        ok = execute_undo()
+    chk_undo_enable = st.checkbox("启用撤销操作", disabled=not cache_exist, key="chk_undo_enable_stu")
+    chk_undo_confirm = st.checkbox("确认执行撤销", disabled=not chk_undo_enable, key="chk_undo_confirm_stu")
+
+    if st.button("✅ 执行撤销", disabled= not (chk_undo_enable and chk_undo_confirm)):
+        ok, msg = execute_undo()
         if ok:
-            st.toast("✅ 撤销完成", icon="✅")
+            st.toast(f"✅ {msg}", icon="✅")
         else:
-            st.toast("❌ 没有可撤销数据", icon="❌")
+            st.toast(f"❌ {msg}", icon="❌")
         st.session_state["undo_cache"] = None
         time.sleep(0.8)
         st.rerun()
