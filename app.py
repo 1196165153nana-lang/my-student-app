@@ -294,7 +294,7 @@ elif st.session_state['menu_choice'] == "account":
 
     # ========== 账目页面底部撤销区域 ==========
     st.divider()
-    st.subheader("🔙 撤销上次删除")
+    st.subheader("🔙 撤销上次操作")
     st.number_input("输入数字1执行撤销", min_value=1, max_value=1, key="undo_num_account", value=1)
     undo_check_account = st.checkbox("确认要撤销这条记录", key="undo_check_account", disabled=st.session_state['undo_cache'] is None)
     if undo_check_account and st.session_state['undo_cache'] is not None:
@@ -342,7 +342,7 @@ elif st.session_state['menu_choice'] == "录入":
 
     # ========== 快速录课页面底部撤销区域 ==========
     st.divider()
-    st.subheader("🔙 撤销上次删除")
+    st.subheader("🔙 撤销上次操作")
     st.number_input("输入数字1执行撤销", min_value=1, max_value=1, key="undo_num_input", value=1)
     undo_check_input = st.checkbox("确认要撤销这条记录", key="undo_check_input", disabled=st.session_state['undo_cache'] is None)
     if undo_check_input and st.session_state['undo_cache'] is not None:
@@ -398,7 +398,7 @@ elif st.session_state['menu_choice'] == "名册":
 
     # ========== 学生档案页面底部撤销区域 ==========
     st.divider()
-    st.subheader("🔙 撤销上次删除")
+    st.subheader("🔙 撤销上次操作")
     st.number_input("输入数字1执行撤销", min_value=1, max_value=1, key="undo_num_roster", value=1)
     undo_check_roster = st.checkbox("确认要撤销这条记录", key="undo_check_roster", disabled=st.session_state['undo_cache'] is None)
     if undo_check_roster and st.session_state['undo_cache'] is not None:
