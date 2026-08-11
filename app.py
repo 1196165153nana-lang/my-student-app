@@ -176,15 +176,6 @@ st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', u
 st.markdown('<p class="brand-desc">掌上拇指便捷管理</p>', unsafe_allow_html=True)
 
 # -------------------------- 4. 逻辑分发 --------------------------
-
-if st.session_state['undo_cache']:
-    if st.sidebar.button("🔙 撤销上次删除", type="primary"):
-        add_feishu_record(st.session_state['undo_cache']['table'], st.session_state['undo_cache']['data'])
-        st.session_state['undo_cache'] = None
-        emoji = random.choice(ANIMAL_EMOJIS)
-        st.toast(f"{emoji} 已恢复！", icon="✅")
-        time.sleep(1); st.rerun()
-
 def back_home():
     st.session_state['menu_choice'] = "首页"
     st.rerun()
@@ -297,9 +288,22 @@ elif st.session_state['menu_choice'] == "account":
             if confirm_check and st.button("执行删除"):
                 st.session_state["undo_cache"] = {"table": TABLE_ID_RECORDS, "data": target_row.to_dict()}
                 delete_feishu_record(TABLE_ID_RECORDS, target_row["record_id"])
-                st.toast("🗑️ 记录已删除，侧边栏可以撤销", icon="⚠️")
+                st.toast("🗑️ 记录已删除，本页面底部可撤销", icon="⚠️")
                 time.sleep(1)
                 st.rerun()
+
+    # ========== 账目页面底部撤销区域 ==========
+    st.divider()
+    st.subheader("🔙 撤销上次删除")
+    st.number_input("输入数字1执行撤销", min_value=1, max_value=1, key="undo_num_account", value=1)
+    undo_check_account = st.checkbox("确认要撤销这条记录", key="undo_check_account", disabled=st.session_state['undo_cache'] is None)
+    if undo_check_account and st.session_state['undo_cache'] is not None:
+        add_feishu_record(st.session_state['undo_cache']['table'], st.session_state['undo_cache']['data'])
+        st.session_state['undo_cache'] = None
+        emoji = random.choice(ANIMAL_EMOJIS)
+        st.toast(f"{emoji} 已恢复！", icon="✅")
+        time.sleep(1)
+        st.rerun()
 
 # --- 模块：录入【修复：提交时实时拉取飞书数据做重复校验】---
 elif st.session_state['menu_choice'] == "录入":
@@ -335,6 +339,19 @@ elif st.session_state['menu_choice'] == "录入":
                 st.toast(f"{emoji} 同步成功", icon="✅")
                 time.sleep(1)
                 st.rerun()
+
+    # ========== 快速录课页面底部撤销区域 ==========
+    st.divider()
+    st.subheader("🔙 撤销上次删除")
+    st.number_input("输入数字1执行撤销", min_value=1, max_value=1, key="undo_num_input", value=1)
+    undo_check_input = st.checkbox("确认要撤销这条记录", key="undo_check_input", disabled=st.session_state['undo_cache'] is None)
+    if undo_check_input and st.session_state['undo_cache'] is not None:
+        add_feishu_record(st.session_state['undo_cache']['table'], st.session_state['undo_cache']['data'])
+        st.session_state['undo_cache'] = None
+        emoji = random.choice(ANIMAL_EMOJIS)
+        st.toast(f"{emoji} 已恢复！", icon="✅")
+        time.sleep(1)
+        st.rerun()
 
 # --- 模块：档案【修复：禁止新增同名学生】---
 elif st.session_state['menu_choice'] == "名册":
@@ -374,9 +391,23 @@ elif st.session_state['menu_choice'] == "名册":
                     time.sleep(1); st.rerun()
                 if c2.button("🗑️ 彻底删除学生"):
                     if st.checkbox("确认删除"):
+                        st.session_state["undo_cache"] = {"table": TABLE_ID_STUDENTS, "data": data.to_dict()}
                         delete_feishu_record(TABLE_ID_STUDENTS, data['record_id'])
-                        st.toast("⚠️ 学员已删除", icon="⚠️")
+                        st.toast("⚠️ 学员已删除，本页面底部可撤销", icon="⚠️")
                         time.sleep(1); st.rerun()
+
+    # ========== 学生档案页面底部撤销区域 ==========
+    st.divider()
+    st.subheader("🔙 撤销上次删除")
+    st.number_input("输入数字1执行撤销", min_value=1, max_value=1, key="undo_num_roster", value=1)
+    undo_check_roster = st.checkbox("确认要撤销这条记录", key="undo_check_roster", disabled=st.session_state['undo_cache'] is None)
+    if undo_check_roster and st.session_state['undo_cache'] is not None:
+        add_feishu_record(st.session_state['undo_cache']['table'], st.session_state['undo_cache']['data'])
+        st.session_state['undo_cache'] = None
+        emoji = random.choice(ANIMAL_EMOJIS)
+        st.toast(f"{emoji} 已恢复！", icon="✅")
+        time.sleep(1)
+        st.rerun()
 
 # --- 模块：导出 ---
 elif st.session_state['menu_choice'] == "导出":
