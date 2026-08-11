@@ -68,7 +68,7 @@ def add_feishu_record(table_id, fields):
     try:
         r = requests.post(url, headers=headers, json=payload, timeout=12)
         resp = r.json()
-        print(f"add_resp:{resp}")
+        print(f"【新增记录完整API返回】{resp}")
         return resp
     except Exception as e:
         print(f"新增记录异常:{e}")
@@ -90,7 +90,7 @@ def delete_feishu_record(table_id, record_id):
     try:
         r = requests.delete(url, headers=headers, timeout=12)
         resp = r.json()
-        print(f"delete resp:{resp}")
+        print(f"【删除记录API返回】{resp}")
         return resp
     except Exception as e:
         print(f"删除异常:{e}")
@@ -107,7 +107,7 @@ def generate_wechat_msg(name, review_date, learn_dates):
     ln_dates_str = "\n".join([datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%m月%d日单词学习内容") for d in sorted_ln])
     return f"【21天抗遗忘单词复习提醒】\n\n{rv_date_str}复习内容为：\n\n{ln_dates_str}\n\n请{name}同学抽出时间复习 巩固单词印象 加油哦💪期待下次的课堂哦"
 
-# --------------------------【修复后的撤销函数】--------------------------
+# --------------------------【撤销函数】--------------------------
 def execute_undo():
     cache = st.session_state.get("undo_cache")
     if not (isinstance(cache, dict) and "action" in cache):
@@ -139,7 +139,7 @@ def execute_undo():
             return False, f"恢复新增失败:{res}"
     return False, "未知操作类型"
 
-# -------------------------- 3. 样式 --------------------------
+# -------------------------- 3. 全局页面样式 --------------------------
 st.set_page_config(page_title="FishTeacher", layout="wide", page_icon="🐟")
 st.markdown("""
 <style>
@@ -219,8 +219,7 @@ st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=Tru
 st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-desc">掌上拇指便捷管理</p>', unsafe_allow_html=True)
 
-# -------------------------- 4. 逻辑分发 --------------------------
-
+# -------------------------- 4. 页面路由分发 --------------------------
 def back_home():
     st.session_state['menu_choice'] = "首页"
     st.rerun()
@@ -237,7 +236,7 @@ if st.session_state['menu_choice'] == "首页":
         if st.button("📄 导出21天"): st.session_state['menu_choice'] = "导出"; st.rerun()
         if st.button("📥 批量数据导入"): st.session_state['menu_choice'] = "导入"; st.rerun()
 
-# --- 模块：提醒 ---
+# --- 复习提醒模块 ---
 elif st.session_state['menu_choice'] == "提醒":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -262,7 +261,7 @@ elif st.session_state['menu_choice'] == "提醒":
                     st.markdown(f"👤 **{name}**"); st.code(generate_wechat_msg(name, q_date, dates), language=None)
         else: st.info("今日该学生无复习任务")
 
-# ==========【账目&明细｜层级：顶部月份+总指标，下方再左右分栏】==========
+# ==========【账目&明细｜顶部总指标+下方左右分栏】==========
 elif st.session_state['menu_choice'] == "account":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -275,7 +274,6 @@ elif st.session_state['menu_choice'] == "account":
         r_df['月份'] = r_df['dt_obj'].dt.strftime('%Y-%m')
         r_df['日期文字'] = r_df['dt_obj'].dt.strftime('%Y-%m-%d')
 
-        # 顶部：月份选择 + 总薪资、总课时指标
         target_m = st.selectbox("📅 选择月份", sorted(r_df['月份'].unique().tolist(), reverse=True))
         m_df = r_df[r_df['月份'] == target_m].copy()
         m_df['单价'] = m_df['学习内容'].apply(get_unit_price)
@@ -289,8 +287,6 @@ elif st.session_state['menu_choice'] == "account":
             st.metric("⌛ 本月总课时", f"{m_df['课时'].sum():.1f} h")
 
         st.divider()
-
-        # 在总指标下面，再开启一层左右分栏：左=统计汇总，右=流水明细
         col_stat, col_log = st.columns([5,5])
 
         with col_stat:
@@ -341,7 +337,6 @@ elif st.session_state['menu_choice'] == "account":
                 time.sleep(1)
                 st.rerun()
 
-        # =========【撤销区域】==========
         st.divider()
         st.subheader("↩️ 撤销上一步操作")
         cache_exist = isinstance(st.session_state.get("undo_cache"), dict)
@@ -362,7 +357,7 @@ elif st.session_state['menu_choice'] == "account":
             time.sleep(0.8)
             st.rerun()
 
-# --- 模块：录入【去掉录入撤销，新增删除上课记录】---
+# --- 快速录课模块（已修复录入成功误报失败、移除录入撤销、新增页面内删除功能）---
 elif st.session_state['menu_choice'] == "录入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -392,17 +387,21 @@ elif st.session_state['menu_choice'] == "录入":
                 ts = int(datetime.datetime.combine(date, datetime.time()).timestamp() * 1000)
                 new_fields = {"姓名": name, "学习日期": ts, "学习内容": content, "课时": hour}
                 resp = add_feishu_record(TABLE_ID_RECORDS, new_fields)
-                record_id = resp.get("data",{}).get("record_id")
-                if not record_id:
-                    st.toast(f"❌ 录入失败，未获取记录ID！{resp}", icon="❌")
+                # 修复Bug：优先判断code=0代表真实入库成功，兼容双层record_id结构
+                if resp.get("code") != 0:
+                    st.toast(f"❌ 录入接口报错：{resp.get('msg','未知错误')}", icon="❌")
                 else:
-                    # 快速录课：不再写入undo_cache，不可撤销
+                    data = resp.get("data", {})
+                    record_id = data.get("record_id")
+                    if not record_id and "record" in data:
+                        record_id = data["record"].get("record_id")
+                    # 快速录课录入成功不写入撤销缓存，无法撤销
                     emoji = random.choice(ANIMAL_EMOJIS)
                     st.toast(f"{emoji} 同步成功", icon="✅")
                     time.sleep(1)
                     st.rerun()
 
-    # =========【快速录课页面新增：删除上课记录功能】==========
+    # 快速录课页面新增删除上课记录区域
     st.divider()
     st.subheader("🗑️ 删除上课记录")
     r_df_del = fetch_feishu_data(TABLE_ID_RECORDS)
@@ -430,11 +429,11 @@ elif st.session_state['menu_choice'] == "录入":
                 "origin_fields": target_row_del.to_dict()
             }
             delete_feishu_record(TABLE_ID_RECORDS, target_row_del["record_id"])
-            st.toast("🗑️ 记录已删除，前往账目页面执行撤销", icon="⚠️")
+            st.toast("🗑️ 记录已删除，前往账目页面执行撤销恢复", icon="⚠️")
             time.sleep(1)
             st.rerun()
 
-# --- 模块：档案【修复：禁止新增同名学生】---
+# --- 学生档案模块 ---
 elif st.session_state['menu_choice'] == "名册":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -489,7 +488,6 @@ elif st.session_state['menu_choice'] == "名册":
                         st.toast("⚠️ 学员已删除，下方可执行撤销", icon="⚠️")
                         time.sleep(1); st.rerun()
 
-    # ========= 名册页面撤销区域 =========
     st.divider()
     st.subheader("↩️ 撤销上一步操作")
     cache_exist = isinstance(st.session_state.get("undo_cache"), dict)
@@ -510,7 +508,7 @@ elif st.session_state['menu_choice'] == "名册":
         time.sleep(0.8)
         st.rerun()
 
-# --- 模块：导出 ---
+# --- 导出21天表模块 ---
 elif st.session_state['menu_choice'] == "导出":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -530,7 +528,7 @@ elif st.session_state['menu_choice'] == "导出":
             emoji = random.choice(ANIMAL_EMOJIS)
             st.toast(f"{emoji} 表格已生成，请下载", icon="✅")
 
-# --- 模块：导入 ---
+# --- 批量导入模块 ---
 elif st.session_state['menu_choice'] == "导入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
