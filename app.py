@@ -175,15 +175,6 @@ st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=Tru
 st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-desc">掌上拇指便捷管理</p>', unsafe_allow_html=True)
 
-# -------------------------- 4. 逻辑分发 --------------------------
-
-if st.session_state['undo_cache']:
-    if st.sidebar.button("🔙 撤销上次删除", type="primary"):
-        add_feishu_record(st.session_state['undo_cache']['table'], st.session_state['undo_cache']['data'])
-        st.session_state['undo_cache'] = None
-        emoji = random.choice(ANIMAL_EMOJIS)
-        st.toast(f"{emoji} 已恢复！", icon="✅")
-        time.sleep(1); st.rerun()
 
 def back_home():
     st.session_state['menu_choice'] = "首页"
@@ -297,9 +288,25 @@ elif st.session_state['menu_choice'] == "account":
             if confirm_check and st.button("执行删除"):
                 st.session_state["undo_cache"] = {"table": TABLE_ID_RECORDS, "data": target_row.to_dict()}
                 delete_feishu_record(TABLE_ID_RECORDS, target_row["record_id"])
-                st.toast("🗑️ 记录已删除，侧边栏可以撤销", icon="⚠️")
+                st.toast("🗑️ 记录已删除，页面底部可撤销", icon="⚠️")
                 time.sleep(1)
                 st.rerun()
+
+    # =========页面底部撤销区域：输入1+点击确认才撤销=========
+    st.divider()
+    if st.session_state['undo_cache']:
+        st.info("⚠️ 存在可撤销操作，请输入数字 1 再点击【确认撤销】")
+        undo_input_text = st.text_input("撤销校验：输入数字1", value="", key="undo_input_account")
+        if st.button("🔙 确认撤销", key="btn_undo_account"):
+            if undo_input_text.strip() == "1":
+                add_feishu_record(st.session_state['undo_cache']['table'], st.session_state['undo_cache']['data'])
+                st.session_state['undo_cache'] = None
+                emoji = random.choice(ANIMAL_EMOJIS)
+                st.toast(f"{emoji} 已恢复！", icon="✅")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.warning("输入错误，必须填写数字 1 才能撤销！")
 
 # --- 模块：录入【修复：提交时实时拉取飞书数据做重复校验】---
 elif st.session_state['menu_choice'] == "录入":
@@ -374,9 +381,26 @@ elif st.session_state['menu_choice'] == "名册":
                     time.sleep(1); st.rerun()
                 if c2.button("🗑️ 彻底删除学生"):
                     if st.checkbox("确认删除"):
+                        st.session_state["undo_cache"] = {"table": TABLE_ID_STUDENTS, "data": data.to_dict()}
                         delete_feishu_record(TABLE_ID_STUDENTS, data['record_id'])
-                        st.toast("⚠️ 学员已删除", icon="⚠️")
+                        st.toast("⚠️ 学员已删除，页面底部可撤销", icon="⚠️")
                         time.sleep(1); st.rerun()
+
+    # =========页面底部撤销区域：输入1+点击确认才撤销=========
+    st.divider()
+    if st.session_state['undo_cache']:
+        st.info("⚠️ 存在可撤销操作，请输入数字 1 再点击【确认撤销】")
+        undo_input_text = st.text_input("撤销校验：输入数字1", value="", key="undo_input_student")
+        if st.button("🔙 确认撤销", key="btn_undo_student"):
+            if undo_input_text.strip() == "1":
+                add_feishu_record(st.session_state['undo_cache']['table'], st.session_state['undo_cache']['data'])
+                st.session_state['undo_cache'] = None
+                emoji = random.choice(ANIMAL_EMOJIS)
+                st.toast(f"{emoji} 已恢复！", icon="✅")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.warning("输入错误，必须填写数字 1 才能撤销！")
 
 # --- 模块：导出 ---
 elif st.session_state['menu_choice'] == "导出":
