@@ -513,7 +513,7 @@ elif st.session_state['menu_choice'] == "名册":
         time.sleep(0.8)
         st.rerun()
 
-# --- 导出21天表模块【已嵌入：导出本月课时表格（行=学生，列=日期）】---
+# --- 导出21天表模块【已嵌入：导出本月课时表格（行=学生，列=日期）；新增21天表格预览】---
 elif st.session_state['menu_choice'] == "导出":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -529,12 +529,16 @@ elif st.session_state['menu_choice'] == "导出":
 
         with tab1:
             target = st.selectbox("学员", sorted(r_all['姓名'].unique().tolist()))
+            sub = r_all[r_all['姓名'] == target].sort_values("dt")
+            output = [["21天表","",""], [f"姓名：{target}","",""], ["日期","复习","新学","第1天","第2天","第3天","第5天","第7天","第9天","第12天","第14天","第17天","第21天"]]
+            for _, row in sub.iterrows():
+                ld = row['dt']; rvs = [(ld + datetime.timedelta(days=d-1)).strftime("%Y/%m/%d") for d in REVIEW_DAYS]
+                output.append([ld.strftime("%Y/%m/%d"),"",""] + rvs)
+            preview_df = pd.DataFrame(output[2:])
+            st.subheader("👁️ 表格预览")
+            st.dataframe(preview_df, use_container_width=True, hide_index=True, height=350)
+
             if st.button("生成21天表格"):
-                sub = r_all[r_all['姓名'] == target].sort_values("dt")
-                output = [["21天表","",""], [f"姓名：{target}","",""], ["日期","复习","新学","第1天","第2天","第3天","第5天","第7天","第9天","第12天","第14天","第17天","第21天"]]
-                for _, row in sub.iterrows():
-                    ld = row['dt']; rvs = [(ld + datetime.timedelta(days=d-1)).strftime("%Y/%m/%d") for d in REVIEW_DAYS]
-                    output.append([ld.strftime("%Y/%m/%d"),"",""] + rvs)
                 buf = io.StringIO(); pd.DataFrame(output).to_csv(buf, index=False, header=False, encoding="utf-8-sig")
                 st.download_button(f"📥 下载 {target}_21天表.csv", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
                 emoji = random.choice(ANIMAL_EMOJIS)
