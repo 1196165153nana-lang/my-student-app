@@ -214,6 +214,23 @@ div[data-testid="stToast"] {
 }
 
 footer {visibility: hidden;}
+
+/* 预览表格强制白色背景，文字黑色，醒目 */
+div[data-testid="stDataFrame"] {
+    background-color: #ffffff !important;
+}
+div[data-testid="stDataFrame"] table {
+    background-color: #ffffff !important;
+}
+div[data-testid="stDataFrame"] th {
+    background-color: #f7f9fc !important;
+    color: #000000 !important;
+}
+div[data-testid="stDataFrame"] td {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
