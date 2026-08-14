@@ -514,12 +514,18 @@ elif st.session_state['menu_choice'] == "名册":
         time.sleep(0.8)
         st.rerun()
 
-# --- 导出21天表模块【课时矩阵表格增加预览，其他全部逻辑不变】---
+# --- 导出21天表模块【课时矩阵增加年级列，文件名带上年级】---
 elif st.session_state['menu_choice'] == "导出":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
     r_all = fetch_feishu_data(TABLE_ID_RECORDS)
+    stu_df_all = fetch_feishu_data(TABLE_ID_STUDENTS)
+    stu_grade_map = dict()
+    if not stu_df_all.empty:
+        for _,row in stu_df_all.iterrows():
+            stu_grade_map[row["姓名"]] = row.get("年级","未填写")
+
     if r_all.empty:
         st.info("暂无上课记录，无法导出")
     else:
@@ -567,10 +573,10 @@ elif st.session_state['menu_choice'] == "导出":
             sorted_stu = sorted(all_stus)
             sorted_date = sorted(all_dates, key=lambda x:(int(x.split(".")[0]), int(x.split(".")[1])))
             csv_rows = []
-            header_row = ["姓名","总课时"] + sorted_date
+            header_row = ["姓名","年级","总课时"] + sorted_date
             csv_rows.append(header_row)
             for s in sorted_stu:
-                row_data = [s, round(stu_total[s],1)]
+                row_data = [s, stu_grade_map.get(s,"未填写"), round(stu_total[s],1)]
                 for d in sorted_date:
                     row_data.append(round(stu_date_h[s].get(d,0.0),1))
                 csv_rows.append(row_data)
@@ -583,7 +589,8 @@ elif st.session_state['menu_choice'] == "导出":
             if st.button("生成课时矩阵表格"):
                 buf2 = io.StringIO()
                 pd.DataFrame(csv_rows).to_csv(buf2, index=False, header=False, encoding="utf-8-sig")
-                st.download_button(f"📥 下载 {sel_month}_课时矩阵表.csv", buf2.getvalue().encode("utf-8-sig"), f"{sel_month}_课时矩阵表.csv", "text/csv")
+                filename = f"{sel_month}_课时矩阵表_含年级.csv"
+                st.download_button(f"📥 下载 {filename}", buf2.getvalue().encode("utf-8-sig"), filename, "text/csv")
                 emoji = random.choice(ANIMAL_EMOJIS)
                 st.toast(f"{emoji} 课时矩阵表格已生成，请下载", icon="✅")
 
