@@ -215,7 +215,7 @@ div[data-testid="stToast"] {
 
 footer {visibility: hidden;}
 
-/* 预览表格强制白色背景，文字黑色，醒目 */
+/* 全部DataFrame表格强制白色背景，黑色文字 */
 div[data-testid="stDataFrame"] {
     background-color: #ffffff !important;
 }
@@ -507,7 +507,7 @@ elif st.session_state['menu_choice'] == "名册":
                             "record_id":data["record_id"],
                             "origin_fields": data.to_dict()
                         }
-                        delete_feishu_record(TABLE_ID_STUDENTS, data['record_id'])
+                        delete_feishu_record(TABLE_ID_STUDENTS, data["record_id"])
                         st.toast("⚠️ 学员已删除，下方可执行撤销", icon="⚠️")
                         time.sleep(1); st.rerun()
 
