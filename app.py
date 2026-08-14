@@ -6,6 +6,7 @@ import datetime
 import io
 import time
 import random
+from collections import defaultdict
 
 # -------------------------- 1. 核心安全配置 (从 Secrets 读取) --------------------------
 APP_ID = st.secrets["FEISHU_APP_ID"]
@@ -513,7 +514,7 @@ elif st.session_state['menu_choice'] == "名册":
         time.sleep(0.8)
         st.rerun()
 
-# --- 导出21天表模块【已嵌入：导出本月课时表格（行=学生，列=日期）；新增21天表格预览】---
+# --- 导出21天表模块【课时矩阵表格增加预览，其他全部逻辑不变】---
 elif st.session_state['menu_choice'] == "导出":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -547,32 +548,39 @@ elif st.session_state['menu_choice'] == "导出":
         with tab2:
             ym_list = sorted([x for x in r_all['ym_str'].unique() if x is not None], reverse=True)
             sel_month = st.selectbox("选择要导出的月份", ym_list)
+
+            # 构建课时矩阵，新增预览
+            df_month = r_all[r_all['ym_str'] == sel_month].copy()
+            df_month["date_short"] = df_month["dt"].apply(lambda d:d.strftime("%m.%d"))
+            stu_date_h = defaultdict(lambda:defaultdict(float))
+            stu_total = defaultdict(float)
+            all_dates = set()
+            all_stus = set()
+            for _,row in df_month.iterrows():
+                sname = row["姓名"]
+                dshort = row["date_short"]
+                h = float(row["课时"])
+                stu_date_h[sname][dshort] += h
+                stu_total[sname] += h
+                all_dates.add(dshort)
+                all_stus.add(sname)
+            sorted_stu = sorted(all_stus)
+            sorted_date = sorted(all_dates, key=lambda x:(int(x.split(".")[0]), int(x.split(".")[1])))
+            csv_rows = []
+            header_row = ["姓名","总课时"] + sorted_date
+            csv_rows.append(header_row)
+            for s in sorted_stu:
+                row_data = [s, round(stu_total[s],1)]
+                for d in sorted_date:
+                    row_data.append(round(stu_date_h[s].get(d,0.0),1))
+                csv_rows.append(row_data)
+
+            # 预览表格
+            st.subheader("👁️ 课时矩阵预览")
+            preview_matrix = pd.DataFrame(csv_rows[1:], columns=csv_rows[0])
+            st.dataframe(preview_matrix, use_container_width=True, hide_index=True, height=380)
+
             if st.button("生成课时矩阵表格"):
-                df_month = r_all[r_all['ym_str'] == sel_month].copy()
-                df_month["date_short"] = df_month["dt"].apply(lambda d:d.strftime("%m.%d"))
-                from collections import defaultdict
-                stu_date_h = defaultdict(lambda:defaultdict(float))
-                stu_total = defaultdict(float)
-                all_dates = set()
-                all_stus = set()
-                for _,row in df_month.iterrows():
-                    sname = row["姓名"]
-                    dshort = row["date_short"]
-                    h = float(row["课时"])
-                    stu_date_h[sname][dshort] += h
-                    stu_total[sname] += h
-                    all_dates.add(dshort)
-                    all_stus.add(sname)
-                sorted_stu = sorted(all_stus)
-                sorted_date = sorted(all_dates, key=lambda x:(int(x.split(".")[0]), int(x.split(".")[1])))
-                csv_rows = []
-                header_row = ["姓名","总课时"] + sorted_date
-                csv_rows.append(header_row)
-                for s in sorted_stu:
-                    row_data = [s, round(stu_total[s],1)]
-                    for d in sorted_date:
-                        row_data.append(round(stu_date_h[s].get(d,0.0),1))
-                    csv_rows.append(row_data)
                 buf2 = io.StringIO()
                 pd.DataFrame(csv_rows).to_csv(buf2, index=False, header=False, encoding="utf-8-sig")
                 st.download_button(f"📥 下载 {sel_month}_课时矩阵表.csv", buf2.getvalue().encode("utf-8-sig"), f"{sel_month}_课时矩阵表.csv", "text/csv")
