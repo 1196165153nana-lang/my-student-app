@@ -20,7 +20,8 @@ REVIEW_DAYS = [1, 2, 3, 5, 7, 9, 12, 14, 17, 21]
 LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初中阅读", "初中语法", "高中阅读", "高中完型", "长难句", "雅思", "托福", "四六级"]
 WORD_ONLY_CONTENTS = ["单词", "旧数据补录", "导入"]
 HOURS_OPTIONS = [float(x)/2 for x in range(1, 21)]
-STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业"]
+# 新增：更换教练状态
+STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业", "更换教练"]
 GRADE_OPTIONS = ["未填写", "小学", "初一", "初二", "初三", "高一", "高二", "高三", "大学", "成人"]
 
 ANIMAL_EMOJIS = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🦆", "🐸", "🦁"]
@@ -465,7 +466,7 @@ elif st.session_state['menu_choice'] == "名册":
         st.session_state["undo_cache"] = None
         time.sleep(0.8); st.rerun()
 
-# --- 导出21天表 + 本月课时表格（结课学生姓名加(结课)）---
+# --- 导出21天表 + 本月课时表格（结课/更换教练后缀）---
 elif st.session_state['menu_choice'] == "导出":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -522,10 +523,13 @@ elif st.session_state['menu_choice'] == "导出":
             sorted_stu = sorted(all_stus)
             sorted_date = sorted(all_dates, key=lambda x:(int(x.split(".")[0]), int(x.split(".")[1])))
 
-            # 【核心改动】结课学生姓名后面加 (结课)
+            # 【改动】结课/更换教练增加后缀
             def display_name(s):
-                if stu_status_map.get(s, "") == "结课/毕业":
+                stat = stu_status_map.get(s, "")
+                if stat == "结课/毕业":
                     return f"{s}(结课)"
+                elif stat == "更换教练":
+                    return f"{s}(更换教练)"
                 return s
 
             csv_rows = []
