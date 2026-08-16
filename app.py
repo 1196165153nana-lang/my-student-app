@@ -380,7 +380,7 @@ elif st.session_state['menu_choice'] == "account":
             st.session_state["undo_cache"] = None
             time.sleep(0.8); st.rerun()
 
-# --- 快速录课【新增编辑tab：日期/内容/课时都可改】 ---
+# --- 快速录课：全部垂直排布，去掉tabs ---
 elif st.session_state['menu_choice'] == "录入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
@@ -388,82 +388,81 @@ elif st.session_state['menu_choice'] == "录入":
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
     active_s = sorted(s_df[s_df['状态'] == "在读/上课"]['姓名'].tolist())
 
-    tab_add, tab_edit_in = st.tabs(["📝 新增录课","✏️ 修改上课记录(日期/内容/课时)"])
+    st.subheader("📝 新增录课")
+    with st.form("in"):
+        name = st.selectbox("学生姓名", active_s)
+        date = st.date_input("上课日期")
+        content = st.selectbox("内容", LEARN_CONTENTS)
+        hour = st.selectbox("课时", HOURS_OPTIONS, index=1)
+        submit = st.form_submit_button("确认录入")
+        if submit:
+            real_time_record_df = fetch_feishu_data(TABLE_ID_RECORDS)
+            duplicate = False
+            if not real_time_record_df.empty:
+                real_time_record_df["parse_date"] = pd.to_datetime(real_time_record_df["学习日期"], unit="ms", errors="coerce").dt.date
+                filter_cond = (real_time_record_df["姓名"] == name) & (real_time_record_df["parse_date"] == date)
+                if real_time_record_df[filter_cond].shape[0] > 0:
+                    duplicate = True
+            if duplicate:
+                st.toast(f"⚠️ 重复录入：{name} 在 {date} 已经存在一节课！同一天只能录入1节课", icon="⚠️")
+            else:
+                ts = int(datetime.datetime.combine(date, datetime.time()).timestamp() * 1000)
+                new_fields = {"姓名": name, "学习日期": ts, "学习内容": content, "课时": hour}
+                resp = add_feishu_record(TABLE_ID_RECORDS, new_fields)
+                if resp.get("code") != 0:
+                    st.toast(f"❌ 录入接口报错：{resp.get('msg','未知错误')}", icon="❌")
+                else:
+                    emoji = random.choice(ANIMAL_EMOJIS)
+                    st.toast(f"{emoji} 同步成功", icon="✅")
+                    time.sleep(1); st.rerun()
 
-    with tab_add:
-        with st.form("in"):
-            name = st.selectbox("学生姓名", active_s)
-            date = st.date_input("上课日期")
-            content = st.selectbox("内容", LEARN_CONTENTS)
-            hour = st.selectbox("课时", HOURS_OPTIONS, index=1)
-            submit = st.form_submit_button("确认录入")
-            if submit:
-                real_time_record_df = fetch_feishu_data(TABLE_ID_RECORDS)
+    st.divider()
+    st.subheader("✏️ 修改上课记录(日期/内容/课时)")
+    r_df_edit = fetch_feishu_data(TABLE_ID_RECORDS)
+    if r_df_edit.empty:
+        st.info("暂无上课记录")
+    else:
+        r_df_edit['dt_obj'] = pd.to_datetime(r_df_edit['学习日期'], unit='ms', errors='coerce')
+        r_df_edit['日期文字'] = r_df_edit['dt_obj'].dt.strftime('%Y-%m-%d')
+        edit_target = None
+        e_stu = st.selectbox("1.选择学生", ["请选择学生"] + sorted(r_df_edit['姓名'].unique().tolist()), key="edit_in_stu")
+        if e_stu != "请选择学生":
+            e_stu_rec = r_df_edit[r_df_edit["姓名"] == e_stu].sort_values("日期文字", ascending=False)
+            e_date_opt = e_stu_rec["日期文字"].tolist()
+            e_date_sel = st.selectbox("2.选择上课日期", ["请选择日期"] + e_date_opt, key="edit_in_date")
+            if e_date_sel != "请选择日期":
+                edit_target = r_df_edit[(r_df_edit["姓名"] == e_stu) & (r_df_edit["日期文字"] == e_date_sel)].iloc[0]
+                st.info(f"当前：{edit_target['日期文字']}｜{edit_target['学习内容']}｜{edit_target['课时']} h")
+        if edit_target is not None:
+            old_c = edit_target["学习内容"]
+            old_h = float(edit_target["课时"])
+            old_d = edit_target["dt_obj"].date()
+            idx_c = LEARN_CONTENTS.index(old_c) if old_c in LEARN_CONTENTS else 0
+            idx_h = HOURS_OPTIONS.index(old_h) if old_h in HOURS_OPTIONS else 1
+            new_d = st.date_input("修改上课日期", value=old_d, key="edit_in_newdate")
+            new_c = st.selectbox("修改学习内容", LEARN_CONTENTS, index=idx_c, key="edit_in_content")
+            new_h = st.selectbox("修改课时时长", HOURS_OPTIONS, index=idx_h, key="edit_in_hour")
+            if st.button("💾 保存修改", key="btn_save_edit_in"):
+                # 重复校验
+                all_rec = fetch_feishu_data(TABLE_ID_RECORDS)
                 duplicate = False
-                if not real_time_record_df.empty:
-                    real_time_record_df["parse_date"] = pd.to_datetime(real_time_record_df["学习日期"], unit="ms", errors="coerce").dt.date
-                    filter_cond = (real_time_record_df["姓名"] == name) & (real_time_record_df["parse_date"] == date)
-                    if real_time_record_df[filter_cond].shape[0] > 0:
+                if not all_rec.empty:
+                    all_rec["parse_date"] = pd.to_datetime(all_rec["学习日期"], unit="ms", errors="coerce").dt.date
+                    dup_cond = (all_rec["姓名"] == e_stu) & (all_rec["parse_date"] == new_d) & (all_rec["record_id"] != edit_target["record_id"])
+                    if all_rec[dup_cond].shape[0] > 0:
                         duplicate = True
                 if duplicate:
-                    st.toast(f"⚠️ 重复录入：{name} 在 {date} 已经存在一节课！同一天只能录入1节课", icon="⚠️")
+                    st.toast(f"⚠️ 重复：{e_stu} 在 {new_d} 已经有一节课！", icon="⚠️")
                 else:
-                    ts = int(datetime.datetime.combine(date, datetime.time()).timestamp() * 1000)
-                    new_fields = {"姓名": name, "学习日期": ts, "学习内容": content, "课时": hour}
-                    resp = add_feishu_record(TABLE_ID_RECORDS, new_fields)
-                    if resp.get("code") != 0:
-                        st.toast(f"❌ 录入接口报错：{resp.get('msg','未知错误')}", icon="❌")
-                    else:
+                    ts = int(datetime.datetime.combine(new_d, datetime.time()).timestamp() * 1000)
+                    update_fields = {"学习日期": ts, "学习内容": new_c, "课时": new_h}
+                    resp = update_feishu_record(TABLE_ID_RECORDS, edit_target["record_id"], update_fields)
+                    if resp.get("code") == 0:
                         emoji = random.choice(ANIMAL_EMOJIS)
-                        st.toast(f"{emoji} 同步成功", icon="✅")
+                        st.toast(f"{emoji} 修改成功！", icon="✅")
                         time.sleep(1); st.rerun()
-
-    with tab_edit_in:
-        r_df_edit = fetch_feishu_data(TABLE_ID_RECORDS)
-        if r_df_edit.empty:
-            st.info("暂无上课记录")
-        else:
-            r_df_edit['dt_obj'] = pd.to_datetime(r_df_edit['学习日期'], unit='ms', errors='coerce')
-            r_df_edit['日期文字'] = r_df_edit['dt_obj'].dt.strftime('%Y-%m-%d')
-            edit_target = None
-            e_stu = st.selectbox("1.选择学生", ["请选择学生"] + sorted(r_df_edit['姓名'].unique().tolist()), key="edit_in_stu")
-            if e_stu != "请选择学生":
-                e_stu_rec = r_df_edit[r_df_edit["姓名"] == e_stu].sort_values("日期文字", ascending=False)
-                e_date_opt = e_stu_rec["日期文字"].tolist()
-                e_date_sel = st.selectbox("2.选择上课日期", ["请选择日期"] + e_date_opt, key="edit_in_date")
-                if e_date_sel != "请选择日期":
-                    edit_target = r_df_edit[(r_df_edit["姓名"] == e_stu) & (r_df_edit["日期文字"] == e_date_sel)].iloc[0]
-                    st.info(f"当前：{edit_target['日期文字']}｜{edit_target['学习内容']}｜{edit_target['课时']} h")
-            if edit_target is not None:
-                old_c = edit_target["学习内容"]
-                old_h = float(edit_target["课时"])
-                old_d = edit_target["dt_obj"].date()
-                idx_c = LEARN_CONTENTS.index(old_c) if old_c in LEARN_CONTENTS else 0
-                idx_h = HOURS_OPTIONS.index(old_h) if old_h in HOURS_OPTIONS else 1
-                new_d = st.date_input("修改上课日期", value=old_d, key="edit_in_newdate")
-                new_c = st.selectbox("修改学习内容", LEARN_CONTENTS, index=idx_c, key="edit_in_content")
-                new_h = st.selectbox("修改课时时长", HOURS_OPTIONS, index=idx_h, key="edit_in_hour")
-                if st.button("💾 保存修改", key="btn_save_edit_in"):
-                    # 重复校验
-                    all_rec = fetch_feishu_data(TABLE_ID_RECORDS)
-                    duplicate = False
-                    if not all_rec.empty:
-                        all_rec["parse_date"] = pd.to_datetime(all_rec["学习日期"], unit="ms", errors="coerce").dt.date
-                        dup_cond = (all_rec["姓名"] == e_stu) & (all_rec["parse_date"] == new_d) & (all_rec["record_id"] != edit_target["record_id"])
-                        if all_rec[dup_cond].shape[0] > 0:
-                            duplicate = True
-                    if duplicate:
-                        st.toast(f"⚠️ 重复：{e_stu} 在 {new_d} 已经有一节课！", icon="⚠️")
                     else:
-                        ts = int(datetime.datetime.combine(new_d, datetime.time()).timestamp() * 1000)
-                        update_fields = {"学习日期": ts, "学习内容": new_c, "课时": new_h}
-                        resp = update_feishu_record(TABLE_ID_RECORDS, edit_target["record_id"], update_fields)
-                        if resp.get("code") == 0:
-                            emoji = random.choice(ANIMAL_EMOJIS)
-                            st.toast(f"{emoji} 修改成功！", icon="✅")
-                            time.sleep(1); st.rerun()
-                        else:
-                            st.toast("❌ 修改失败，请检查网络", icon="❌")
+                        st.toast("❌ 修改失败，请检查网络", icon="❌")
 
     st.divider()
     st.subheader("🗑️ 删除上课记录")
