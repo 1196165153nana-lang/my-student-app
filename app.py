@@ -142,7 +142,7 @@ st.markdown("""
 <style>
 .block-container { max-width: 1400px !important; padding-top: 1rem !important; padding-left:2rem; padding-right:2rem; }
 @media (max-width: 768px) {
-[data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
+ [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
 }
 div.stButton > button {
     width: 330px !important;
@@ -164,11 +164,7 @@ div.stButton > button:active { background-color: #5289f7 !important; }
 .brand-title {font-size: 32px;font-weight: bold;text-align: center;margin-bottom: 10px; }
 .brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px;}
 .brand-desc {font-size: 10px;color:#666666;text-align: center;margin-bottom: 15px;}
-.back-btn-box div.stButton > button {
-height: 55px !important; font-size: 16px !important; width: 300px !important;
-background-color: transparent !important; border: 1px solid #555 !important;
-justify-content: center !important; padding-left: 0 !important;
-}
+.back-btn-box div.stButton > button { height: 55px !important; font-size: 16px !important; width: 300px !important; background-color: transparent !important; border: 1px solid #555 !important; justify-content: center !important; padding-left: 0 !important; }
 div[data-baseweb="popover"] ul li {
         min-height: 100px !important;
         font-size: 22px !important;
@@ -587,11 +583,38 @@ elif st.session_state['menu_choice'] == "导出":
                 st.download_button(f"📥 下载 {target}_21天表.csv", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
                 emoji = random.choice(ANIMAL_EMOJIS)
                 st.toast(f"{emoji} 21天表格已生成，请下载", icon="✅")
+
         with tab2:
             ym_list = sorted([x for x in r_all['ym_str'].unique() if x is not None], reverse=True)
             sel_month = st.selectbox("选择要导出的月份", ym_list)
             df_month = r_all[r_all['ym_str'] == sel_month].copy()
             df_month["date_short"] = df_month["dt"].apply(lambda d:d.strftime("%m.%d"))
+
+            # ============【新增：课型工资汇总表，和截图对齐】============
+            st.divider()
+            st.subheader("💰本月各课型工资汇总")
+            df_month["课型单价"] = df_month["学习内容"].apply(get_unit_price)
+            # 合并课型分组，和截图分类匹配
+            def merge_type(ct):
+                if ct in ["初中阅读","初中语法"]:
+                    return "初中阅读/语法"
+                elif ct in ["高中阅读","高中完型","长难句","雅思","托福","四六级"]:
+                    return "高中阅读/初高中长难句/雅思托福四六级"
+                else:
+                    return "单词/小学阅读"
+            df_month["课型分类"] = df_month["学习内容"].apply(merge_type)
+            type_stat = df_month.groupby("课型分类").agg(
+                单价=("课型单价","first"),
+                总课时=("课时","sum")
+            ).reset_index()
+            type_stat["应发工资"] = type_stat["单价"] * type_stat["总课时"]
+            type_stat = type_stat[["课型分类","单价","总课时","应发工资"]]
+            st.dataframe(type_stat, use_container_width=True, hide_index=True)
+            total_salary = type_stat["应发工资"].sum()
+            st.markdown(f"### ✅ {sel_month} 全部课型合计工资：**¥{total_salary:.0f}**")
+            st.divider()
+            # ==========================================================
+
             stu_date_h = defaultdict(lambda:defaultdict(float))
             stu_total = defaultdict(float)
             all_dates = set()
@@ -684,8 +707,7 @@ elif st.session_state['menu_choice'] == "wordflow":
 
     st.subheader("二、上去下来学新｜向上复习旧单词，往下学习新单词")
     st.markdown("""
->以1组5个单词为示例：
-**学1→学2→复1、2→学3→复2、1、2、3→学4→复3、2、1、2、3、4→学5**
+>以1组5个单词为示例： **学1→学2→复1、2→学3→复2、1、2、3→学4→复3、2、1、2、3、4→学5**
 """)
 
     st.subheader("三、五上三下二上（学到第5个单词的复习逻辑）")
@@ -700,7 +722,6 @@ elif st.session_state['menu_choice'] == "wordflow":
     st.subheader("六、模拟剪纸条（2分钟完成，动作流畅快速）")
     st.markdown("""
 学生说出一两个字的时候，就准备下一个单词，加快衔接速度。
-
 >📝备注：遇到学生不熟悉的单词：教练带读2遍英文 +1遍中文，同时点击空白显示中文
 
 🔁循环规则
@@ -713,7 +734,6 @@ elif st.session_state['menu_choice'] == "wordflow":
     st.markdown("""
 全部打勾，学生快速说出英文+中文。
 遇到不熟悉、翻译错误单词：点出中文，带读两遍英文一遍中文。
-
 > ⚠️重点：学后检测依旧不熟 = 没有掌握，需要记录后台重新学习。
 """)
 
