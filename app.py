@@ -7,14 +7,12 @@ import io
 import time
 import random
 from collections import defaultdict
-
 # -------------------------- 1. 核心安全配置 (从 Secrets 读取) --------------------------
 APP_ID = st.secrets["FEISHU_APP_ID"]
 APP_SECRET = st.secrets["FEISHU_APP_SECRET"]
 APP_TOKEN = st.secrets["FEISHU_APP_TOKEN"]
 TABLE_ID_STUDENTS = st.secrets["TABLE_ID_STUDENTS"]
 TABLE_ID_RECORDS = st.secrets["TABLE_ID_RECORDS"]
-
 # 业务规则配置
 REVIEW_DAYS = [1, 2, 3, 5, 7, 9, 12, 14, 17, 21]
 LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初中阅读", "初中语法", "高中阅读", "高中完型", "长难句", "雅思", "托福", "四六级"]
@@ -23,12 +21,10 @@ HOURS_OPTIONS = [float(x)/2 for x in range(1, 21)]
 STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业", "更换教练"]
 GRADE_OPTIONS = ["未填写", "小学", "初一", "初二", "初三", "高一", "高二", "高三", "大学", "成人"]
 ANIMAL_EMOJIS = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🦆", "🐸", "🦁"]
-
 if 'menu_choice' not in st.session_state:
     st.session_state['menu_choice'] = "首页"
 if "undo_cache" not in st.session_state:
     st.session_state["undo_cache"] = None
-
 # -------------------------- 2. 核心工具函数 --------------------------
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
@@ -38,7 +34,6 @@ def get_tenant_access_token():
     except Exception as e:
         print(f"获取token失败:{e}")
         return None
-
 def fetch_feishu_data(table_id):
     token = get_tenant_access_token()
     if not token: return pd.DataFrame()
@@ -57,7 +52,6 @@ def fetch_feishu_data(table_id):
     except Exception as e:
         print(f"拉取数据异常:{e}")
         return pd.DataFrame()
-
 def add_feishu_record(table_id, fields):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
@@ -73,7 +67,6 @@ def add_feishu_record(table_id, fields):
     except Exception as e:
         print(f"新增记录异常:{e}")
         return {"code": -1}
-
 def update_feishu_record(table_id, record_id, fields):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records/{record_id}"
@@ -82,7 +75,6 @@ def update_feishu_record(table_id, record_id, fields):
         r = requests.put(url, headers=headers, json={"fields": fields}, timeout=12)
         return r.json()
     except: return {"code": -1}
-
 def delete_feishu_record(table_id, record_id):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records/{record_id}"
@@ -95,18 +87,15 @@ def delete_feishu_record(table_id, record_id):
     except Exception as e:
         print(f"删除异常:{e}")
         return {"code":-1}
-
 def get_unit_price(content):
     if content in ["初中阅读", "初中语法"]: return 45
     if content in ["高中阅读", "高中完型", "长难句", "雅思单词", "大学单词", "雅思", "托福", "四六级"]: return 50
     return 40
-
 def generate_wechat_msg(name, review_date, learn_dates):
     rv_date_str = review_date.strftime("%m月%d日")
     sorted_ln = sorted(list(set(learn_dates)))
     ln_dates_str = "\n".join([datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%m月%d日单词学习内容") for d in sorted_ln])
     return f"【21天抗遗忘单词复习提醒】\n\n{rv_date_str}复习内容为：\n\n{ln_dates_str}\n\n请{name}同学抽出时间复习 巩固单词印象 加油哦💪期待下次的课堂哦"
-
 def execute_undo():
     cache = st.session_state.get("undo_cache")
     if not (isinstance(cache, dict) and "action" in cache):
@@ -135,7 +124,6 @@ def execute_undo():
         else:
             return False, f"恢复新增失败:{res}"
     return False, "未知操作类型"
-
 # -------------------------- 3. 全局页面样式 --------------------------
 st.set_page_config(page_title="FishTeacher", layout="wide", page_icon="🐟")
 st.markdown("""
@@ -212,11 +200,9 @@ div[data-testid="stDataFrame"] td { background-color: #ffffff !important; color:
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-desc">掌上拇指便捷管理</p>', unsafe_allow_html=True)
-
 def back_home():
     st.session_state['menu_choice'] = "首页"
     st.rerun()
-
 # --- 首页菜单 ---
 if st.session_state['menu_choice'] == "首页":
     col1, col2 = st.columns(2)
@@ -229,7 +215,6 @@ if st.session_state['menu_choice'] == "首页":
         if st.button("📄 导出21天"): st.session_state['menu_choice'] = "导出"; st.rerun()
         if st.button("📥 批量数据导入"): st.session_state['menu_choice'] = "导入"; st.rerun()
         if st.button("📖单词带背流程"): st.session_state['menu_choice'] = "wordflow"; st.rerun()
-
 # --- 复习提醒模块 ---
 elif st.session_state['menu_choice'] == "提醒":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
@@ -254,7 +239,6 @@ elif st.session_state['menu_choice'] == "提醒":
                 with st.container(border=True):
                     st.markdown(f"👤 **{name}**"); st.code(generate_wechat_msg(name, q_date, dates), language=None)
         else: st.info("今日该学生无复习任务")
-
 # --- 账目&明细【修改支持日期】 ---
 elif st.session_state['menu_choice'] == "account":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
@@ -375,7 +359,6 @@ elif st.session_state['menu_choice'] == "account":
             else: st.toast(f"❌ {msg}", icon="❌")
             st.session_state["undo_cache"] = None
             time.sleep(0.8); st.rerun()
-
 # --- 快速录课：全部垂直排布，去掉tabs ---
 elif st.session_state['menu_choice'] == "录入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
@@ -483,7 +466,6 @@ elif st.session_state['menu_choice'] == "录入":
             delete_feishu_record(TABLE_ID_RECORDS, target_row_del["record_id"])
             st.toast("🗑️ 记录已删除，前往账目页面执行撤销恢复", icon="⚠️")
             time.sleep(1); st.rerun()
-
 # --- 学生档案 ---
 elif st.session_state['menu_choice'] == "名册":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
@@ -552,7 +534,6 @@ elif st.session_state['menu_choice'] == "名册":
         else: st.toast(f"❌ {msg}", icon="❌")
         st.session_state["undo_cache"] = None
         time.sleep(0.8); st.rerun()
-
 # --- 导出21天表 + 本月课时表格 ---
 elif st.session_state['menu_choice'] == "导出":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
@@ -626,14 +607,35 @@ elif st.session_state['menu_choice'] == "导出":
             st.subheader("👁️ 课时矩阵预览")
             preview_matrix = pd.DataFrame(csv_rows[1:], columns=csv_rows[0])
             st.dataframe(preview_matrix, use_container_width=True, hide_index=True, height=380)
+
+            # ============【新增：课型工资统计表】============
+            st.divider()
+            st.subheader("👁️ 课型工资统计预览")
+            df_month["课型"] = df_month["学习内容"]
+            df_month["单价"] = df_month["学习内容"].apply(get_unit_price)
+            stat_df = df_month.groupby(["课型","单价"],dropna=False).agg(数量=("课时","sum")).reset_index()
+            stat_df["应发工资"] = stat_df["单价"] * stat_df["数量"]
+            stat_df = stat_df[["课型","单价","数量","应发工资"]]
+            total_h = stat_df["数量"].sum()
+            total_money = stat_df["应发工资"].sum()
+            st.dataframe(stat_df, use_container_width=True, hide_index=True)
+            st.info(f"✅ 课时总数：{total_h:.1f} h｜应发总金额：¥{total_money:.0f}")
+
+            # 工资统计部分追加到csv_rows末尾，导出csv一并保存
+            csv_rows.append([])
+            csv_rows.append(["课程","单价","数量","应发工资"])
+            for _,r in stat_df.iterrows():
+                csv_rows.append([r["课型"], r["单价"], round(r["数量"],1), round(r["应发工资"],0)])
+            csv_rows.append(["课时总数", round(total_h,1), "应发金额", round(total_money,0)])
+            # ================================================
+
             if st.button("生成课时矩阵表格"):
                 buf2 = io.StringIO()
                 pd.DataFrame(csv_rows).to_csv(buf2, index=False, header=False, encoding="utf-8-sig")
-                filename = f"{sel_month}_课时矩阵表_含年级.csv"
+                filename = f"{sel_month}_课时矩阵表_含年级_工资统计.csv"
                 st.download_button(f"📥 下载 {filename}", buf2.getvalue().encode("utf-8-sig"), filename, "text/csv")
                 emoji = random.choice(ANIMAL_EMOJIS)
-                st.toast(f"{emoji} 课时矩阵表格已生成，请下载", icon="✅")
-
+                st.toast(f"{emoji} 课时矩阵+工资统计表格已生成，请下载", icon="✅")
 # --- 批量导入 ---
 elif st.session_state['menu_choice'] == "导入":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
@@ -658,22 +660,17 @@ elif st.session_state['menu_choice'] == "导入":
             emoji = random.choice(ANIMAL_EMOJIS)
             st.toast(f"{emoji} 批量导入完成", icon="✅")
             time.sleep(1.2); st.rerun()
-
 # ====================== 新增：单词带背流程页面 ======================
 elif st.session_state['menu_choice'] == "wordflow":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
-
     st.header("📖 单词训练带背完整流程")
     st.markdown("> 上课对照流程，可上传原始流程示意图")
-
     upload_img = st.file_uploader("上传单词训练流程照片", type=["png","jpg","jpeg"])
     if upload_img is not None:
         st.image(upload_img, use_container_width=True)
-
     st.divider()
-
     st.subheader("一、跟读带读环节")
     st.markdown("""
 1. 教练正常速度带读1遍英文，学生跟读1遍英文
@@ -681,42 +678,32 @@ elif st.session_state['menu_choice'] == "wordflow":
 3. 教练带读1遍英文(同时点击空白显示中文)，学生跟读英+中；快速带读2英+1中，学生跟读2英+1中
 4. 教练读英文，用手挡住英文，学生说出1遍英文+1遍中文
 """)
-
     st.subheader("二、上去下来学新｜向上复习旧单词，往下学习新单词")
     st.markdown("""
 >以1组5个单词为示例：
 **学1→学2→复1、2→学3→复2、1、2、3→学4→复3、2、1、2、3、4→学5**
 """)
-
     st.subheader("三、五上三下二上（学到第5个单词的复习逻辑）")
     st.markdown("**54345，212**：从第五个往上复习到第三个单词，再下回到第五个单词；再从第二个单词往上复习，再回到第二个")
-
     st.subheader("四、总复习（1‑5，5‑1）")
     st.markdown("能多快有多快；教练点击单词空白带读英文，学生说出英文+中文")
-
     st.subheader("五、听音识单词（1‑5，5‑1）")
     st.markdown("学生闭上眼睛，播放单词发音，学生说出英文和中文，**教练不带读**")
-
     st.subheader("六、模拟剪纸条（2分钟完成，动作流畅快速）")
     st.markdown("""
 学生说出一两个字的时候，就准备下一个单词，加快衔接速度。
-
 >📝备注：遇到学生不熟悉的单词：教练带读2遍英文 +1遍中文，同时点击空白显示中文
-
 🔁循环规则
 - **组内循环**：5个单词为一组，本组全部学完，单词剪给学生
 - **组组循环**：学完第2组，第1+2组合并；学完第3组，1+2+3组合并
 - **章循环**：9组合计45个单词全部学完，全部混组，一整章单词给到学生
 """)
-
     st.subheader("七、学后检测")
     st.markdown("""
 全部打勾，学生快速说出英文+中文。
 遇到不熟悉、翻译错误单词：点出中文，带读两遍英文一遍中文。
-
 > ⚠️重点：学后检测依旧不熟 = 没有掌握，需要记录后台重新学习。
 """)
-
     st.divider()
     st.subheader("📌课堂反馈评语（直接复制）")
     c1,c2 = st.columns(2)
@@ -726,4 +713,3 @@ elif st.session_state['menu_choice'] == "wordflow":
     with c2:
         st.code("本节课复习反馈良好，已学内容无明显遗忘，维持现有节奏稳步积累。", language=None)
         st.code("部分单词熟练度不足，标记待复习，后续课堂重点复盘巩固。", language=None)
-
