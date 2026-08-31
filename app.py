@@ -145,11 +145,127 @@ def execute_undo():
     return False, "未知操作类型"
 
 # -------------------------- 3. 全局页面样式 --------------------------
-st.set_page_config (page_title="FishTeacher", layout="wide", page_icon="🐟")
+st.set_page_config(page_title="FishTeacher", layout="wide", page_icon="🐟")
+st.markdown("""
+<style>
+.block-container {
+    max-width: 1400px !important;
+    padding-top: 1rem !important;
+    padding-left:2rem;
+    padding-right:2rem;
+}
+@media (max-width: 768px) {
+    [data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+}
+div.stButton > button {
+    width: 330px !important;
+    height: 100px !important;
+    margin: 0 auto 15px auto !important;
+    font-size: 22px !important;
+    font-weight: bold !important;
+    color: #FFFFFF !important;
+    background-color: #21242c !important;
+    border: 2px solid #5289f7 !important;
+    border-radius: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding-left: 25px !important;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3) !important;
+}
+div.stButton > button:active {
+    background-color: #5289f7 !important;
+}
+.brand-title {
+    font-size: 32px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 10px;
+}
+.brand-subtitle {
+    font-size: 30px;
+    color:#444444;
+    text-align: center;
+    margin-bottom: 10px;
+}
+.brand-desc {
+    font-size: 10px;
+    color:#666666;
+    text-align: center;
+    margin-bottom: 15px;
+}
+.back-btn-box div.stButton > button {
+    height: 55px !important;
+    font-size: 16px !important;
+    width: 300px !important;
+    background-color: transparent !important;
+    border: 1px solid #555 !important;
+    justify-content: center !important;
+    padding-left: 0 !important;
+}
+div[data-baseweb="popover"] ul li {
+    min-height: 100px !important;
+    font-size: 22px !important;
+    padding: 12px 20px !important;
+}
+div[data-baseweb="popover"] ul {
+    background-color: #1c1e24 !important;
+    border-radius: 16px !important;
+}
+div[data-baseweb="popover"] ul li:hover {
+    background-color: #333640 !important;
+}
+div[data-baseweb="popover"] ul li[aria-selected="true"] {
+    background-color: #2a3142 !important;
+}
+div[data-testid="stToast"] {
+    position: fixed !important;
+    top: 45vh !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 360px !important;
+    font-size: 22px !important;
+    font-weight:bold !important;
+    padding:26px !important;
+    border-radius:20px !important;
+    z-index: 9999 !important;
+    animation: toastBounce 0.4s ease-out;
+}
+@keyframes toastBounce {
+    0% { transform: translate(-50%, -50%) scale(0.6); opacity:0; }
+    60% { transform: translate(-50%, -50%) scale(1.1); }
+    100% { transform: translate(-50%, -50%) scale(1); opacity:1; }
+}
+footer {visibility: hidden;}
+div[data-testid="stDataFrame"] {
+    background-color: #ffffff !important;
+}
+div[data-testid="stDataFrame"] table {
+    background-color: #ffffff !important;
+}
+div[data-testid="stDataFrame"] th {
+    background-color: #f7f9fc !important;
+    color: #000000 !important;
+}
+div[data-testid="stDataFrame"] td {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
-def back_home ():
-    st.session_state ['menu_choice'] = "首页"
-    st.rerun ()
+# 修正：去除重复标题，只保留一套
+st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
+st.markdown('<p class="brand-desc">掌上拇指便捷管理</p>', unsafe_allow_html=True)
+
+def back_home():
+    st.session_state['menu_choice'] = "首页"
+    st.rerun()
+
 
 # --- 首页菜单 ---
 if st.session_state ['menu_choice'] == "首页":
