@@ -583,13 +583,11 @@ elif st.session_state['menu_choice'] == "导出":
                 st.download_button(f"📥 下载 {target}_21天表.csv", buf.getvalue().encode("utf-8-sig"), f"{target}_21天表.csv", "text/csv")
                 emoji = random.choice(ANIMAL_EMOJIS)
                 st.toast(f"{emoji} 21天表格已生成，请下载", icon="✅")
-
         with tab2:
             ym_list = sorted([x for x in r_all['ym_str'].unique() if x is not None], reverse=True)
             sel_month = st.selectbox("选择要导出的月份", ym_list)
             df_month = r_all[r_all['ym_str'] == sel_month].copy()
             df_month["date_short"] = df_month["dt"].apply(lambda d:d.strftime("%m.%d"))
-
             # ============【新增：课型工资汇总表，和截图对齐】============
             st.divider()
             st.subheader("💰本月各课型工资汇总")
@@ -611,10 +609,10 @@ elif st.session_state['menu_choice'] == "导出":
             type_stat = type_stat[["课型分类","单价","总课时","应发工资"]]
             st.dataframe(type_stat, use_container_width=True, hide_index=True)
             total_salary = type_stat["应发工资"].sum()
-            st.markdown(f"### ✅ {sel_month} 全部课型合计工资：**¥{total_salary:.0f}**")
+            # ✅修复：emoji移出f-string，消除ValueError报错
+            st.markdown("### ✅ " + f"{sel_month} 全部课型合计工资：**¥{total_salary:.0f}**")
             st.divider()
             # ==========================================================
-
             stu_date_h = defaultdict(lambda:defaultdict(float))
             stu_total = defaultdict(float)
             all_dates = set()
@@ -687,16 +685,12 @@ elif st.session_state['menu_choice'] == "wordflow":
     st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
     st.markdown('</div>', unsafe_allow_html=True)
-
     st.header("📖 单词训练带背完整流程")
     st.markdown("> 上课对照流程，可上传原始流程示意图")
-
     upload_img = st.file_uploader("上传单词训练流程照片", type=["png","jpg","jpeg"])
     if upload_img is not None:
         st.image(upload_img, use_container_width=True)
-
     st.divider()
-
     st.subheader("一、跟读带读环节")
     st.markdown("""
 1. 教练正常速度带读1遍英文，学生跟读1遍英文
@@ -704,39 +698,31 @@ elif st.session_state['menu_choice'] == "wordflow":
 3. 教练带读1遍英文(同时点击空白显示中文)，学生跟读英+中；快速带读2英+1中，学生跟读2英+1中
 4. 教练读英文，用手挡住英文，学生说出1遍英文+1遍中文
 """)
-
     st.subheader("二、上去下来学新｜向上复习旧单词，往下学习新单词")
     st.markdown("""
 >以1组5个单词为示例： **学1→学2→复1、2→学3→复2、1、2、3→学4→复3、2、1、2、3、4→学5**
 """)
-
     st.subheader("三、五上三下二上（学到第5个单词的复习逻辑）")
     st.markdown("**54345，212**：从第五个往上复习到第三个单词，再下回到第五个单词；再从第二个单词往上复习，再回到第二个")
-
     st.subheader("四、总复习（1‑5，5‑1）")
     st.markdown("能多快有多快；教练点击单词空白带读英文，学生说出英文+中文")
-
     st.subheader("五、听音识单词（1‑5，5‑1）")
     st.markdown("学生闭上眼睛，播放单词发音，学生说出英文和中文，**教练不带读**")
-
     st.subheader("六、模拟剪纸条（2分钟完成，动作流畅快速）")
     st.markdown("""
 学生说出一两个字的时候，就准备下一个单词，加快衔接速度。
 >📝备注：遇到学生不熟悉的单词：教练带读2遍英文 +1遍中文，同时点击空白显示中文
-
 🔁循环规则
 - **组内循环**：5个单词为一组，本组全部学完，单词剪给学生
 - **组组循环**：学完第2组，第1+2组合并；学完第3组，1+2+3组合并
 - **章循环**：9组合计45个单词全部学完，全部混组，一整章单词给到学生
 """)
-
     st.subheader("七、学后检测")
     st.markdown("""
 全部打勾，学生快速说出英文+中文。
 遇到不熟悉、翻译错误单词：点出中文，带读两遍英文一遍中文。
 > ⚠️重点：学后检测依旧不熟 = 没有掌握，需要记录后台重新学习。
 """)
-
     st.divider()
     st.subheader("📌课堂反馈评语（直接复制）")
     c1,c2 = st.columns(2)
@@ -746,4 +732,3 @@ elif st.session_state['menu_choice'] == "wordflow":
     with c2:
         st.code("本节课复习反馈良好，已学内容无明显遗忘，维持现有节奏稳步积累。", language=None)
         st.code("部分单词熟练度不足，标记待复习，后续课堂重点复盘巩固。", language=None)
-
