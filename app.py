@@ -99,11 +99,14 @@ def delete_feishu_record(table_id, record_id):
         print(f"删除异常:{e}")
         return {"code":-1}
 
+# ========= 单价逻辑 =========
 def get_unit_price(content):
-    if content in ["初中阅读", "初中语法"]:
-        return 45
-    if content in ["高中阅读", "高中完型", "长难句", "雅思单词", "大学单词", "雅思", "托福", "四六级"]:
+    """小学初中高中单词40；大学单词、雅思单词50；旧数据补录按普通单词40"""
+    s = str(content)
+    if "大学单词" in s or "雅思单词" in s:
         return 50
+    if "小学" in s or "初中" in s or "高中" in s or "旧数据补录" in s:
+        return 40
     return 40
 
 def generate_wechat_msg(name, review_date, learn_dates):
@@ -191,7 +194,7 @@ elif st.session_state['menu_choice'] == "提醒":
         else:
             st.info("今日该学生无复习任务")
 
-# --- 账目&明细【修改支持日期 + 新增：按单价课型统计】 ---
+# --- 账目&明细 ---
 elif st.session_state['menu_choice'] == "account":
     if st.button("🏠 返回主菜单"): back_home()
     st.header("📊账目&明细")
@@ -204,6 +207,7 @@ elif st.session_state['menu_choice'] == "account":
         r_df['日期文字'] = r_df['dt_obj'].dt.strftime('%Y-%m-%d')
         target_m = st.selectbox("📅 选择月份", sorted(r_df['月份'].unique().tolist(), reverse=True))
         m_df = r_df[r_df['月份'] == target_m].copy()
+
         m_df['单价'] = m_df['学习内容'].apply(get_unit_price)
         m_df['课时'] = pd.to_numeric(m_df['课时']).fillna(0)
         m_df['小计'] = m_df['课时'] * m_df['单价']
@@ -214,26 +218,13 @@ elif st.session_state['menu_choice'] == "account":
         with col_metric_2:
             st.metric("⌛ 本月总课时", f"{m_df['课时'].sum():.1f} h")
 
-        # ==========新增：按单价划分的课型统计==========
-        st.subheader("📋本月各课型按单价统计")
-        # 单价分组汇总（小学/初中/高中单词=40，大学单词/雅思单词=50 等，来自get_unit_price）
-        price_stat = m_df.groupby(["单价","学习内容"]).agg({"课时":"sum","小计":"sum"}).reset_index()
-        price_stat = price_stat.sort_values("单价", ascending=False)
-        # 汇总行
-        total_h = price_stat["课时"].sum()
-        total_money = price_stat["小计"].sum()
-        price_stat_display = price_stat.copy()
-        price_stat_display.columns = ["单价","课型","总课时","总金额"]
-        st.dataframe(price_stat_display, use_container_width=True, hide_index=True)
-        st.markdown("**合计：" + f"总课时 {total_h:.1f} h｜总金额 ¥{total_money:.0f}**")
-        # =============================================
-
         st.divider()
         col_stat, col_log = st.columns([5,5])
         with col_stat:
             st.subheader("📋 学生月度统计")
+            # ========= 修改点：旧数据补录归入单词课(合并) =========
             def merge_c(c):
-                if c in ["单词", "旧数据补录", "导入", "大学单词", "雅思单词"]:
+                if c in ["单词", "旧数据补录", "大学单词", "雅思单词"]:
                     return "单词课(合并)"
                 return c
             m_df['统计课型'] = m_df['学习内容'].apply(merge_c)
@@ -246,11 +237,11 @@ elif st.session_state['menu_choice'] == "account":
             search_n = st.selectbox("🔍 选择学生查看当月明细", ["请选择"] + final['姓名'].unique().tolist())
             if search_n != "请选择":
                 detail = m_df[m_df['姓名'] == search_n].sort_values(by='日期文字', ascending=False)
-                st.dataframe(detail[['日期文字', '学习内容', '课时', '小计']], use_container_width=True, hide_index=True)
+                st.dataframe(detail[['日期文字', '学习内容', '课时','单价','小计']], use_container_width=True, hide_index=True)
         with col_log:
             st.subheader("📜 全部流水记录")
             show_df = m_df.copy()
-            st.dataframe(show_df[["姓名","日期文字","学习内容","课时"]], use_container_width=True, hide_index=True, height=400)
+            st.dataframe(show_df[["姓名","日期文字","学习内容","课时","单价","小计"]], use_container_width=True, hide_index=True, height=400)
             st.divider()
             tab_del, tab_edit = st.tabs(["🗑️ 删除上课记录","✏️ 修改上课记录(日期/内容/课时)"])
             with tab_del:
@@ -292,7 +283,6 @@ elif st.session_state['menu_choice'] == "account":
                     new_content = st.selectbox("修改学习内容", LEARN_CONTENTS, index=idx_cont, key="edit_acc_content")
                     new_hour = st.selectbox("修改课时时长", HOURS_OPTIONS, index=idx_hour, key="edit_acc_hour")
                     if st.button("💾 保存修改", key="btn_save_edit_acc"):
-                        # 重复校验：同一天同一学生不能有其他记录
                         all_rec = fetch_feishu_data(TABLE_ID_RECORDS)
                         duplicate = False
                         if not all_rec.empty:
@@ -390,7 +380,6 @@ elif st.session_state['menu_choice'] == "录入":
             new_c = st.selectbox("修改学习内容", LEARN_CONTENTS, index=idx_c, key="edit_in_content")
             new_h = st.selectbox("修改课时时长", HOURS_OPTIONS, index=idx_h, key="edit_in_hour")
             if st.button("💾 保存修改", key="btn_save_edit_in"):
-                # 重复校验
                 all_rec = fetch_feishu_data(TABLE_ID_RECORDS)
                 duplicate = False
                 if not all_rec.empty:
@@ -617,7 +606,7 @@ elif st.session_state['menu_choice'] == "导入":
             st.toast(f"{emoji} 批量导入完成", icon="✅")
             time.sleep(1.2); st.rerun()
 
-# ====================== 新增：单词带背流程页面 ======================
+# ====================== 单词带背流程页面 ======================
 elif st.session_state['menu_choice'] == "wordflow":
     if st.button("🏠 返回主菜单"): back_home()
     st.header("📖 单词训练带背完整流程")
@@ -668,3 +657,4 @@ elif st.session_state['menu_choice'] == "wordflow":
     with c2:
         st.code("本节课复习反馈良好，已学内容无明显遗忘，维持现有节奏稳步积累。", language=None)
         st.code("部分单词熟练度不足，标记待复习，后续课堂重点复盘巩固。", language=None)
+
