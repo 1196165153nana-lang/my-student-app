@@ -99,9 +99,9 @@ def delete_feishu_record(table_id, record_id):
         print(f"删除异常:{e}")
         return {"code":-1}
 
-# ========= 单价逻辑 =========
+# ========= 单价逻辑，只改这里，页面不动 =========
 def get_unit_price(content):
-    """小学初中高中单词40；大学单词、雅思单词50；旧数据补录按普通单词40"""
+    """小学初中高中单词40；大学单词、雅思单词50"""
     s = str(content)
     if "大学单词" in s or "雅思单词" in s:
         return 50
@@ -145,26 +145,26 @@ def execute_undo():
     return False, "未知操作类型"
 
 # -------------------------- 3. 全局页面样式 --------------------------
-st.set_page_config(page_title="FishTeacher", layout="wide", page_icon="🐟")
+st.set_page_config (page_title="FishTeacher", layout="wide", page_icon="🐟")
 
-def back_home():
-    st.session_state['menu_choice'] = "首页"
-    st.rerun()
+def back_home ():
+    st.session_state ['menu_choice'] = "首页"
+    st.rerun ()
 
 # --- 首页菜单 ---
-if st.session_state['menu_choice'] == "首页":
-    st.markdown("# 🐟 FishTeacher")
-    st.markdown("掌上拇指便捷管理")
-    col1, col2 = st.columns(2)
+if st.session_state ['menu_choice'] == "首页":
+    st.markdown ("# 🐟 FishTeacher")
+    st.markdown ("掌上拇指便捷管理")
+    col1, col2 = st.columns (2)
     with col1:
-        if st.button("🔍 复习提醒"): st.session_state['menu_choice'] = "提醒"; st.rerun()
-        if st.button("📊 账目&明细"): st.session_state['menu_choice'] = "account"; st.rerun()
-        if st.button("👥 学生档案"): st.session_state['menu_choice'] = "名册"; st.rerun()
+        if st.button ("🔍 复习提醒"): st.session_state ['menu_choice'] = "提醒"; st.rerun ()
+        if st.button ("📊 账目 & 明细"): st.session_state ['menu_choice'] = "account"; st.rerun ()
+        if st.button ("👥 学生档案"): st.session_state ['menu_choice'] = "名册"; st.rerun ()
     with col2:
-        if st.button("📝 快速录课"): st.session_state['menu_choice'] = "录入"; st.rerun()
-        if st.button("📄 导出21天"): st.session_state['menu_choice'] = "导出"; st.rerun()
-        if st.button("📥 批量数据导入"): st.session_state['menu_choice'] = "导入"; st.rerun()
-        if st.button("📖单词带背流程"): st.session_state['menu_choice'] = "wordflow"; st.rerun()
+        if st.button ("📝 快速录课"): st.session_state ['menu_choice'] = "录入"; st.rerun ()
+        if st.button ("📄 导出 21 天"): st.session_state ['menu_choice'] = "导出"; st.rerun ()
+        if st.button ("📥 批量数据导入"): st.session_state ['menu_choice'] = "导入"; st.rerun ()
+        if st.button ("📖单词带背流程"): st.session_state ['menu_choice'] = "wordflow"; st.rerun ()
 
 # --- 复习提醒模块 ---
 elif st.session_state['menu_choice'] == "提醒":
@@ -194,7 +194,7 @@ elif st.session_state['menu_choice'] == "提醒":
         else:
             st.info("今日该学生无复习任务")
 
-# --- 账目&明细 ---
+# --- 账目&明细【恢复原版界面，只增加单价计算，不新增额外统计面板】 ---
 elif st.session_state['menu_choice'] == "account":
     if st.button("🏠 返回主菜单"): back_home()
     st.header("📊账目&明细")
@@ -208,6 +208,7 @@ elif st.session_state['menu_choice'] == "account":
         target_m = st.selectbox("📅 选择月份", sorted(r_df['月份'].unique().tolist(), reverse=True))
         m_df = r_df[r_df['月份'] == target_m].copy()
 
+        # 仅在这里注入单价计算，界面布局完全不动
         m_df['单价'] = m_df['学习内容'].apply(get_unit_price)
         m_df['课时'] = pd.to_numeric(m_df['课时']).fillna(0)
         m_df['小计'] = m_df['课时'] * m_df['单价']
@@ -222,9 +223,8 @@ elif st.session_state['menu_choice'] == "account":
         col_stat, col_log = st.columns([5,5])
         with col_stat:
             st.subheader("📋 学生月度统计")
-            # ========= 修改点：旧数据补录归入单词课(合并) =========
             def merge_c(c):
-                if c in ["单词", "旧数据补录", "大学单词", "雅思单词"]:
+                if c in ["单词", "旧数据补录", "导入", "大学单词", "雅思单词"]:
                     return "单词课(合并)"
                 return c
             m_df['统计课型'] = m_df['学习内容'].apply(merge_c)
@@ -383,7 +383,7 @@ elif st.session_state['menu_choice'] == "录入":
                 all_rec = fetch_feishu_data(TABLE_ID_RECORDS)
                 duplicate = False
                 if not all_rec.empty:
-                    all_rec["parse_date"] = pd.to_datetime(all_rec["学习日期"], unit="ms", errors="coerce").dt.date
+                    all_rec["parse_date"] = pd.to_datetime(all_rec["学习日期"], unit='ms', errors="coerce").dt.date
                     dup_cond = (all_rec["姓名"] == e_stu) & (all_rec["parse_date"] == new_d) & (all_rec["record_id"] != edit_target["record_id"])
                     if all_rec[dup_cond].shape[0] > 0:
                         duplicate = True
@@ -475,7 +475,7 @@ elif st.session_state['menu_choice'] == "名册":
                             "action":"delete","table_id":TABLE_ID_STUDENTS,
                             "record_id":data["record_id"],"origin_fields": data.to_dict()
                         }
-                        delete_feishu_record(TABLE_ID_STUDENTS, data['record_id'])
+                        delete_feishu_record(TABLE_ID_STUDENTS, data["record_id"])
                         st.toast("⚠️ 学员已删除，下方可执行撤销", icon="⚠️")
                         time.sleep(1); st.rerun()
     st.divider()
@@ -657,4 +657,3 @@ elif st.session_state['menu_choice'] == "wordflow":
     with c2:
         st.code("本节课复习反馈良好，已学内容无明显遗忘，维持现有节奏稳步积累。", language=None)
         st.code("部分单词熟练度不足，标记待复习，后续课堂重点复盘巩固。", language=None)
-
