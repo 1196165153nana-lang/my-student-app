@@ -450,7 +450,6 @@ elif st.session_state['menu_choice'] == "account":
             st.session_state["undo_cache"] = None
             time.sleep(0.8)
             st.rerun()
-
 # --- 快速录课：全部垂直排布，去掉tabs ---
 elif st.session_state['menu_choice'] == "录入":
     if st.button("🏠 返回主菜单"): back_home()
