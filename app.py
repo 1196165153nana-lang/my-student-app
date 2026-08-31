@@ -266,7 +266,6 @@ def back_home():
     st.session_state['menu_choice'] = "首页"
     st.rerun()
 
-
 # --- 首页菜单 ---
 if st.session_state ['menu_choice'] == "首页":
     st.markdown ("# 🐟 FishTeacher")
@@ -310,10 +309,9 @@ elif st.session_state['menu_choice'] == "提醒":
         else:
             st.info("今日该学生无复习任务")
 
-# --- 账目&明细 ---
+# --- 账目&明细【恢复原版界面，只增加单价计算，不新增额外统计面板】 ---
 elif st.session_state['menu_choice'] == "account":
-    if st.button("🏠 返回主菜单"):
-        back_home()
+    if st.button("🏠 返回主菜单"): back_home()
     st.header("📊账目&明细")
     r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     if r_df.empty:
@@ -322,9 +320,10 @@ elif st.session_state['menu_choice'] == "account":
         r_df['dt_obj'] = pd.to_datetime(r_df['学习日期'], unit='ms', errors='coerce')
         r_df['月份'] = r_df['dt_obj'].dt.strftime('%Y-%m')
         r_df['日期文字'] = r_df['dt_obj'].dt.strftime('%Y-%m-%d')
-
         target_m = st.selectbox("📅 选择月份", sorted(r_df['月份'].unique().tolist(), reverse=True))
         m_df = r_df[r_df['月份'] == target_m].copy()
+
+        # 仅在这里注入单价计算，界面布局完全不动
         m_df['单价'] = m_df['学习内容'].apply(get_unit_price)
         m_df['课时'] = pd.to_numeric(m_df['课时']).fillna(0)
         m_df['小计'] = m_df['课时'] * m_df['单价']
@@ -339,9 +338,8 @@ elif st.session_state['menu_choice'] == "account":
         col_stat, col_log = st.columns([5,5])
         with col_stat:
             st.subheader("📋 学生月度统计")
-            # ========= 修改点：旧数据补录归入单词课(合并) =========
             def merge_c(c):
-                if c in ["单词", "旧数据补录", "大学单词", "雅思单词"]:
+                if c in ["单词", "旧数据补录", "导入", "大学单词", "雅思单词"]:
                     return "单词课(合并)"
                 return c
             m_df['统计课型'] = m_df['学习内容'].apply(merge_c)
@@ -350,87 +348,75 @@ elif st.session_state['menu_choice'] == "account":
             final = pd.merge(s_order[['姓名']], s_sum, on='姓名', how='left')
             final.insert(0, '序号', final['姓名'].map({n: i+1 for i, n in enumerate(s_order['姓名'].unique())}))
             st.dataframe(final, use_container_width=True, hide_index=True, height=340)
-
             st.write("---")
             search_n = st.selectbox("🔍 选择学生查看当月明细", ["请选择"] + final['姓名'].unique().tolist())
             if search_n != "请选择":
                 detail = m_df[m_df['姓名'] == search_n].sort_values(by='日期文字', ascending=False)
                 st.dataframe(detail[['日期文字', '学习内容', '课时','单价','小计']], use_container_width=True, hide_index=True)
-
         with col_log:
             st.subheader("📜 全部流水记录")
             show_df = m_df.copy()
             st.dataframe(show_df[["姓名","日期文字","学习内容","课时","单价","小计"]], use_container_width=True, hide_index=True, height=400)
-
-        st.divider()
-        tab_del, tab_edit = st.tabs(["🗑️ 删除上课记录","✏️ 修改上课记录(日期/内容/课时)"])
-
-        with tab_del:
-            target_row = None
-            del_student = st.selectbox("1.选择学生", ["请选择学生"] + sorted(show_df['姓名'].unique().tolist()), key="del_acc_stu")
-            if del_student != "请选择学生":
-                student_records = show_df[show_df["姓名"] == del_student].sort_values("日期文字", ascending=False)
-                date_options = student_records["日期文字"].tolist()
-                del_date = st.selectbox("2.选择上课日期", ["请选择日期"] + date_options, key="del_acc_date")
-                if del_date != "请选择日期":
-                    target_row = show_df[(show_df["姓名"] == del_student) & (show_df["日期文字"] == del_date)].iloc[0]
-                    st.info(f"待删除：{del_student}｜{del_date}｜{target_row['学习内容']}｜{target_row['课时']}h")
-            confirm_check = st.checkbox("确认要删除这条记录", disabled=(target_row is None), key="chk_del_acc")
-            if confirm_check and st.button("执行删除", key="btn_del_acc"):
-                st.session_state["undo_cache"] = {
-                    "action":"delete",
-                    "table_id":TABLE_ID_RECORDS,
-                    "record_id":target_row["record_id"],
-                    "origin_fields": target_row.to_dict()
-                }
-                delete_feishu_record(TABLE_ID_RECORDS, target_row["record_id"])
-                st.toast("🗑️ 记录已删除，下方可执行撤销", icon="⚠️")
-                time.sleep(1)
-                st.rerun()
-
-        with tab_edit:
-            edit_target_row = None
-            edit_student = st.selectbox("1.选择学生", ["请选择学生"] + sorted(show_df['姓名'].unique().tolist()), key="edit_acc_stu")
-            if edit_student != "请选择学生":
-                stu_rec_edit = show_df[show_df["姓名"] == edit_student].sort_values("日期文字", ascending=False)
-                date_opt_edit = stu_rec_edit["日期文字"].tolist()
-                edit_date_sel = st.selectbox("2.选择上课日期", ["请选择日期"] + date_opt_edit, key="edit_acc_date")
-                if edit_date_sel != "请选择日期":
-                    edit_target_row = show_df[(show_df["姓名"] == edit_student) & (show_df["日期文字"] == edit_date_sel)].iloc[0]
-                    st.info(f"当前：{edit_target_row['日期文字']}｜{edit_target_row['学习内容']}｜{edit_target_row['课时']} h")
-            if edit_target_row is not None:
-                old_content = edit_target_row["学习内容"]
-                old_hour = float(edit_target_row["课时"])
-                old_date = edit_target_row["dt_obj"].date()
-                idx_cont = LEARN_CONTENTS.index(old_content) if old_content in LEARN_CONTENTS else 0
-                idx_hour = HOURS_OPTIONS.index(old_hour) if old_hour in HOURS_OPTIONS else 1
-
-                new_date = st.date_input("修改上课日期", value=old_date, key="edit_acc_newdate")
-                new_content = st.selectbox("修改学习内容", LEARN_CONTENTS, index=idx_cont, key="edit_acc_content")
-                new_hour = st.selectbox("修改课时时长", HOURS_OPTIONS, index=idx_hour, key="edit_acc_hour")
-
-                if st.button("💾 保存修改", key="btn_save_edit_acc"):
-                    all_rec = fetch_feishu_data(TABLE_ID_RECORDS)
-                    duplicate = False
-                    if not all_rec.empty:
-                        all_rec["parse_date"] = pd.to_datetime(all_rec["学习日期"], unit="ms", errors="coerce").dt.date
-                        dup_cond = (all_rec["姓名"] == edit_student) & (all_rec["parse_date"] == new_date) & (all_rec["record_id"] != edit_target_row["record_id"])
-                        if all_rec[dup_cond].shape[0] > 0:
-                            duplicate = True
-                    if duplicate:
-                        st.toast(f"⚠️ 重复：{edit_student} 在 {new_date} 已经有一节课！", icon="⚠️")
-                    else:
-                        ts = int(datetime.datetime.combine(new_date, datetime.time()).timestamp() * 1000)
-                        update_fields = {"学习日期": ts, "学习内容": new_content, "课时": new_hour}
-                        resp = update_feishu_record(TABLE_ID_RECORDS, edit_target_row["record_id"], update_fields)
-                        if resp.get("code") == 0:
-                            emoji = random.choice(ANIMAL_EMOJIS)
-                            st.toast(f"{emoji} 修改成功！", icon="✅")
-                            time.sleep(1)
-                            st.rerun()
+            st.divider()
+            tab_del, tab_edit = st.tabs(["🗑️ 删除上课记录","✏️ 修改上课记录(日期/内容/课时)"])
+            with tab_del:
+                target_row = None
+                del_student = st.selectbox("1.选择学生", ["请选择学生"] + sorted(show_df['姓名'].unique().tolist()), key="del_acc_stu")
+                if del_student != "请选择学生":
+                    student_records = show_df[show_df["姓名"] == del_student].sort_values("日期文字", ascending=False)
+                    date_options = student_records["日期文字"].tolist()
+                    del_date = st.selectbox("2.选择上课日期", ["请选择日期"] + date_options, key="del_acc_date")
+                    if del_date != "请选择日期":
+                        target_row = show_df[(show_df["姓名"] == del_student) & (show_df["日期文字"] == del_date)].iloc[0]
+                        st.info(f"待删除：{del_student}｜{del_date}｜{target_row['学习内容']}｜{target_row['课时']}h")
+                confirm_check = st.checkbox("确认要删除这条记录", disabled=(target_row is None), key="chk_del_acc")
+                if confirm_check and st.button("执行删除", key="btn_del_acc"):
+                    st.session_state["undo_cache"] = {
+                        "action":"delete","table_id":TABLE_ID_RECORDS,
+                        "record_id":target_row["record_id"],"origin_fields": target_row.to_dict()
+                    }
+                    delete_feishu_record(TABLE_ID_RECORDS, target_row["record_id"])
+                    st.toast("🗑️ 记录已删除，下方可执行撤销", icon="⚠️")
+                    time.sleep(1); st.rerun()
+            with tab_edit:
+                edit_target_row = None
+                edit_student = st.selectbox("1.选择学生", ["请选择学生"] + sorted(show_df['姓名'].unique().tolist()), key="edit_acc_stu")
+                if edit_student != "请选择学生":
+                    stu_rec_edit = show_df[show_df["姓名"] == edit_student].sort_values("日期文字", ascending=False)
+                    date_opt_edit = stu_rec_edit["日期文字"].tolist()
+                    edit_date_sel = st.selectbox("2.选择上课日期", ["请选择日期"] + date_opt_edit, key="edit_acc_date")
+                    if edit_date_sel != "请选择日期":
+                        edit_target_row = show_df[(show_df["姓名"] == edit_student) & (show_df["日期文字"] == edit_date_sel)].iloc[0]
+                        st.info(f"当前：{edit_target_row['日期文字']}｜{edit_target_row['学习内容']}｜{edit_target_row['课时']} h")
+                if edit_target_row is not None:
+                    old_content = edit_target_row["学习内容"]
+                    old_hour = float(edit_target_row["课时"])
+                    old_date = edit_target_row["dt_obj"].date()
+                    idx_cont = LEARN_CONTENTS.index(old_content) if old_content in LEARN_CONTENTS else 0
+                    idx_hour = HOURS_OPTIONS.index(old_hour) if old_hour in HOURS_OPTIONS else 1
+                    new_date = st.date_input("修改上课日期", value=old_date, key="edit_acc_newdate")
+                    new_content = st.selectbox("修改学习内容", LEARN_CONTENTS, index=idx_cont, key="edit_acc_content")
+                    new_hour = st.selectbox("修改课时时长", HOURS_OPTIONS, index=idx_hour, key="edit_acc_hour")
+                    if st.button("💾 保存修改", key="btn_save_edit_acc"):
+                        all_rec = fetch_feishu_data(TABLE_ID_RECORDS)
+                        duplicate = False
+                        if not all_rec.empty:
+                            all_rec["parse_date"] = pd.to_datetime(all_rec["学习日期"], unit="ms", errors="coerce").dt.date
+                            dup_cond = (all_rec["姓名"] == edit_student) & (all_rec["parse_date"] == new_date) & (all_rec["record_id"] != edit_target_row["record_id"])
+                            if all_rec[dup_cond].shape[0] > 0:
+                                duplicate = True
+                        if duplicate:
+                            st.toast(f"⚠️ 重复：{edit_student} 在 {new_date} 已经有一节课！", icon="⚠️")
                         else:
-                            st.toast("❌ 修改失败，请检查网络", icon="❌")
-
+                            ts = int(datetime.datetime.combine(new_date, datetime.time()).timestamp() * 1000)
+                            update_fields = {"学习日期": ts, "学习内容": new_content, "课时": new_hour}
+                            resp = update_feishu_record(TABLE_ID_RECORDS, edit_target_row["record_id"], update_fields)
+                            if resp.get("code") == 0:
+                                emoji = random.choice(ANIMAL_EMOJIS)
+                                st.toast(f"{emoji} 修改成功！", icon="✅")
+                                time.sleep(1); st.rerun()
+                            else:
+                                st.toast("❌ 修改失败，请检查网络", icon="❌")
         st.divider()
         st.subheader("↩️ 撤销上一步操作")
         cache_exist = isinstance(st.session_state.get("undo_cache"), dict)
@@ -438,7 +424,6 @@ elif st.session_state['menu_choice'] == "account":
             st.success(f"✅ 存在待撤销操作：{st.session_state['undo_cache']['action']}")
         else:
             st.warning("⚠️ 无待撤销缓存")
-
         chk_undo_enable = st.checkbox("启用撤销操作", disabled=not cache_exist, key="chk_undo_enable_acc")
         chk_undo_confirm = st.checkbox("确认执行撤销", disabled=not chk_undo_enable, key="chk_undo_confirm_acc")
         if st.button("✅ 执行撤销", disabled= not (chk_undo_enable and chk_undo_confirm)):
@@ -448,8 +433,8 @@ elif st.session_state['menu_choice'] == "account":
             else:
                 st.toast(f"❌ {msg}", icon="❌")
             st.session_state["undo_cache"] = None
-            time.sleep(0.8)
-            st.rerun()
+            time.sleep(0.8); st.rerun()
+
 # --- 快速录课：全部垂直排布，去掉tabs ---
 elif st.session_state['menu_choice'] == "录入":
     if st.button("🏠 返回主菜单"): back_home()
