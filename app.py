@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import streamlit as st
 import requests
 import pandas as pd
@@ -10,7 +9,6 @@ import random
 from collections import defaultdict
 
 # -------------------------- 1. 核心安全配置 (从 Secrets 读取) --------------------------
-
 APP_ID = st.secrets["FEISHU_APP_ID"]
 APP_SECRET = st.secrets["FEISHU_APP_SECRET"]
 APP_TOKEN = st.secrets["FEISHU_APP_TOKEN"]
@@ -18,7 +16,6 @@ TABLE_ID_STUDENTS = st.secrets["TABLE_ID_STUDENTS"]
 TABLE_ID_RECORDS = st.secrets["TABLE_ID_RECORDS"]
 
 # 业务规则配置
-
 REVIEW_DAYS = [1, 2, 3, 5, 7, 9, 12, 14, 17, 21]
 LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初中阅读", "初中语法", "高中阅读", "高中完型", "长难句", "雅思", "托福", "四六级"]
 WORD_ONLY_CONTENTS = ["单词", "旧数据补录", "导入"]
@@ -27,21 +24,12 @@ STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业", "更换教�
 GRADE_OPTIONS = ["未填写", "小学", "初一", "初二", "初三", "高一", "高二", "高三", "大学", "成人"]
 ANIMAL_EMOJIS = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🦆", "🐸", "🦁"]
 
-# ====================新增安全求和工具函数【仅此一处新增】====================
-def safe_sum(series):
-    s = series.sum()
-    if pd.isna(s):
-        return 0.0
-    return float(s)
-# =========================================================================
-
 if 'menu_choice' not in st.session_state:
     st.session_state['menu_choice'] = "首页"
 if "undo_cache" not in st.session_state:
     st.session_state["undo_cache"] = None
 
 # -------------------------- 2. 核心工具函数 --------------------------
-
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
     try:
@@ -50,6 +38,7 @@ def get_tenant_access_token():
     except Exception as e:
         print(f"获取token失败:{e}")
         return None
+
 def fetch_feishu_data(table_id):
     token = get_tenant_access_token()
     if not token: return pd.DataFrame()
@@ -68,6 +57,7 @@ def fetch_feishu_data(table_id):
     except Exception as e:
         print(f"拉取数据异常:{e}")
         return pd.DataFrame()
+
 def add_feishu_record(table_id, fields):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
@@ -83,6 +73,7 @@ def add_feishu_record(table_id, fields):
     except Exception as e:
         print(f"新增记录异常:{e}")
         return {"code": -1}
+
 def update_feishu_record(table_id, record_id, fields):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records/{record_id}"
@@ -91,6 +82,7 @@ def update_feishu_record(table_id, record_id, fields):
         r = requests.put(url, headers=headers, json={"fields": fields}, timeout=12)
         return r.json()
     except: return {"code": -1}
+
 def delete_feishu_record(table_id, record_id):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records/{record_id}"
@@ -103,15 +95,18 @@ def delete_feishu_record(table_id, record_id):
     except Exception as e:
         print(f"删除异常:{e}")
         return {"code":-1}
+
 def get_unit_price(content):
     if content in ["初中阅读", "初中语法"]: return 45
     if content in ["高中阅读", "高中完型", "长难句", "雅思单词", "大学单词", "雅思", "托福", "四六级"]: return 50
     return 40
+
 def generate_wechat_msg(name, review_date, learn_dates):
     rv_date_str = review_date.strftime("%m月%d日")
     sorted_ln = sorted(list(set(learn_dates)))
     ln_dates_str = "\n".join([datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%m月%d日单词学习内容") for d in sorted_ln])
     return f"【21天抗遗忘单词复习提醒】\n\n{rv_date_str}复习内容为：\n\n{ln_dates_str}\n\n请{name}同学抽出时间复习 巩固单词印象 加油哦💪期待下次的课堂哦"
+
 def execute_undo():
     cache = st.session_state.get("undo_cache")
     if not (isinstance(cache, dict) and "action" in cache):
@@ -142,20 +137,87 @@ def execute_undo():
     return False, "未知操作类型"
 
 # -------------------------- 3. 全局页面样式 --------------------------
-
 st.set_page_config(page_title="FishTeacher", layout="wide", page_icon="🐟")
 st.markdown("""
-
+<style>
+.block-container { max-width: 1400px !important; padding-top: 1rem !important; padding-left:2rem; padding-right:2rem; }
+@media (max-width: 768px) {
+[data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; min-width: 100% !important; }
+}
+div.stButton > button {
+    width: 330px !important;
+    height: 100px !important;
+    margin: 0 auto 15px auto !important;
+    font-size: 22px !important;
+    font-weight: bold !important;
+    color: #FFFFFF !important;
+    background-color: #21242c !important;
+    border: 2px solid #5289f7 !important;
+    border-radius: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding-left: 25px !important;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3) !important;
+}
+div.stButton > button:active { background-color: #5289f7 !important; }
+.brand-title {font-size: 32px;font-weight: bold;text-align: center;margin-bottom: 10px; }
+.brand-subtitle { font-size: 30px; color:#444444;text-align: center;margin-bottom: 10px;}
+.brand-desc {font-size: 10px;color:#666666;text-align: center;margin-bottom: 15px;}
+.back-btn-box div.stButton > button {
+height: 55px !important; font-size: 16px !important; width: 300px !important;
+background-color: transparent !important; border: 1px solid #555 !important;
+justify-content: center !important; padding-left: 0 !important;
+}
+div[data-baseweb="popover"] ul li {
+        min-height: 100px !important;
+        font-size: 22px !important;
+        padding: 12px 20px !important;
+    }
+div[data-baseweb="popover"] ul {
+        background-color: #1c1e24 !important;
+        border-radius: 16px !important;
+    }
+div[data-baseweb="popover"] ul li:hover {
+        background-color: #333640 !important;
+    }
+div[data-baseweb="popover"] ul li[aria-selected="true"] {
+        background-color: #2a3142 !important;
+    }
+div[data-testid="stToast"] {
+    position: fixed !important;
+    top: 45vh !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 360px !important;
+    font-size: 22px !important;
+    font-weight:bold !important;
+    padding:26px !important;
+    border-radius:20px !important;
+    z-index: 9999 !important;
+    animation: toastBounce 0.4s ease-out;
+}
+@keyframes toastBounce {
+    0% { transform: translate(-50%, -50%) scale(0.6); opacity:0; }
+    60% { transform: translate(-50%, -50%) scale(1.1); }
+    100% { transform: translate(-50%, -50%) scale(1); opacity:1; }
+}
+footer {visibility: hidden;}
+div[data-testid="stDataFrame"] { background-color: #ffffff !important; }
+div[data-testid="stDataFrame"] table { background-color: #ffffff !important; }
+div[data-testid="stDataFrame"] th { background-color: #f7f9fc !important; color: #000000 !important; }
+div[data-testid="stDataFrame"] td { background-color: #ffffff !important; color: #000000 !important; }
+</style>
 """, unsafe_allow_html=True)
-st.markdown('🐟 FishTeacher', unsafe_allow_html=True)
-st.markdown('**🐟 FishTeacher**', unsafe_allow_html=True)
-st.markdown('掌上拇指便捷管理', unsafe_allow_html=True)
+st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
+st.markdown('<p class="brand-subtitle"><strong>🐟 FishTeacher</strong></p>', unsafe_allow_html=True)
+st.markdown('<p class="brand-desc">掌上拇指便捷管理</p>', unsafe_allow_html=True)
+
 def back_home():
     st.session_state['menu_choice'] = "首页"
     st.rerun()
 
 # --- 首页菜单 ---
-
 if st.session_state['menu_choice'] == "首页":
     col1, col2 = st.columns(2)
     with col1:
@@ -169,11 +231,10 @@ if st.session_state['menu_choice'] == "首页":
         if st.button("📖单词带背流程"): st.session_state['menu_choice'] = "wordflow"; st.rerun()
 
 # --- 复习提醒模块 ---
-
 elif st.session_state['menu_choice'] == "提醒":
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     if not r_df.empty:
         r_df['dt'] = pd.to_datetime(r_df['学习日期'], unit='ms', errors='coerce').dt.date
@@ -195,11 +256,10 @@ elif st.session_state['menu_choice'] == "提醒":
         else: st.info("今日该学生无复习任务")
 
 # --- 账目&明细【修改支持日期】 ---
-
 elif st.session_state['menu_choice'] == "account":
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     r_df = fetch_feishu_data(TABLE_ID_RECORDS)
     if r_df.empty:
         st.info("暂无上课记录")
@@ -317,11 +377,10 @@ elif st.session_state['menu_choice'] == "account":
             time.sleep(0.8); st.rerun()
 
 # --- 快速录课：全部垂直排布，去掉tabs ---
-
 elif st.session_state['menu_choice'] == "录入":
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
     active_s = sorted(s_df[s_df['状态'] == "在读/上课"]['姓名'].tolist())
     st.subheader("📝 新增录课")
@@ -335,7 +394,7 @@ elif st.session_state['menu_choice'] == "录入":
             real_time_record_df = fetch_feishu_data(TABLE_ID_RECORDS)
             duplicate = False
             if not real_time_record_df.empty:
-                real_time_record_df["parse_date"] = pd.to_datetime(real_time_record_df["学习日期"], unit='ms', errors="coerce").dt.date
+                real_time_record_df["parse_date"] = pd.to_datetime(real_time_record_df["学习日期"], unit="ms", errors="coerce").dt.date
                 filter_cond = (real_time_record_df["姓名"] == name) & (real_time_record_df["parse_date"] == date)
                 if real_time_record_df[filter_cond].shape[0] > 0:
                     duplicate = True
@@ -382,7 +441,7 @@ elif st.session_state['menu_choice'] == "录入":
                 all_rec = fetch_feishu_data(TABLE_ID_RECORDS)
                 duplicate = False
                 if not all_rec.empty:
-                    all_rec["parse_date"] = pd.to_datetime(all_rec["学习日期"], unit='ms', errors="coerce").dt.date
+                    all_rec["parse_date"] = pd.to_datetime(all_rec["学习日期"], unit="ms", errors="coerce").dt.date
                     dup_cond = (all_rec["姓名"] == e_stu) & (all_rec["parse_date"] == new_d) & (all_rec["record_id"] != edit_target["record_id"])
                     if all_rec[dup_cond].shape[0] > 0:
                         duplicate = True
@@ -426,11 +485,10 @@ elif st.session_state['menu_choice'] == "录入":
             time.sleep(1); st.rerun()
 
 # --- 学生档案 ---
-
 elif st.session_state['menu_choice'] == "名册":
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     s_df = fetch_feishu_data(TABLE_ID_STUDENTS)
     with st.expander("➕ 添加新学员", expanded=True):
         with st.form("add"):
@@ -496,11 +554,10 @@ elif st.session_state['menu_choice'] == "名册":
         time.sleep(0.8); st.rerun()
 
 # --- 导出21天表 + 本月课时表格 ---
-
 elif st.session_state['menu_choice'] == "导出":
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     r_all = fetch_feishu_data(TABLE_ID_RECORDS)
     stu_df_all = fetch_feishu_data(TABLE_ID_STUDENTS)
     stu_grade_map = dict()
@@ -569,43 +626,19 @@ elif st.session_state['menu_choice'] == "导出":
             st.subheader("👁️ 课时矩阵预览")
             preview_matrix = pd.DataFrame(csv_rows[1:], columns=csv_rows[0])
             st.dataframe(preview_matrix, use_container_width=True, hide_index=True, height=380)
-            # ============【新增：课型工资统计表】============
-            st.divider()
-            st.subheader("👁️ 课型工资统计预览")
-            df_month["课型"] = df_month["学习内容"]
-            df_month["单价"] = df_month["学习内容"].apply(get_unit_price)
-            stat_df = df_month.groupby(["课型","单价"],dropna=False).agg(数量=("课时","sum")).reset_index()
-            stat_df["应发工资"] = stat_df["单价"] * stat_df["数量"]
-            stat_df = stat_df[["课型","单价","数量","应发工资"]]
-
-            # ----------------核心修复：使用safe_sum，解决numpy.float64 NaN崩溃----------------
-            total_h = safe_sum(stat_df["数量"])
-            total_money = safe_sum(stat_df["应发工资"])
-            # --------------------------------------------------------------------------------
-
-            st.dataframe(stat_df, use_container_width=True, hide_index=True)
-            st.info(f"✅ 课时总数：{total_h:.1f} h｜应发总金额：¥{total_money:.0f}")
-            # 工资统计部分追加到csv_rows末尾，导出csv一并保存
-            csv_rows.append([])
-            csv_rows.append(["课程","单价","数量","应发工资"])
-            for _,r in stat_df.iterrows():
-                csv_rows.append([r["课型"], r["单价"], round(r["数量"],1), round(r["应发工资"],0)])
-            csv_rows.append(["课时总数", round(total_h,1), "应发金额", round(total_money,0)])
-            # ================================================
             if st.button("生成课时矩阵表格"):
                 buf2 = io.StringIO()
                 pd.DataFrame(csv_rows).to_csv(buf2, index=False, header=False, encoding="utf-8-sig")
-                filename = f"{sel_month}_课时矩阵表_含年级_工资统计.csv"
+                filename = f"{sel_month}_课时矩阵表_含年级.csv"
                 st.download_button(f"📥 下载 {filename}", buf2.getvalue().encode("utf-8-sig"), filename, "text/csv")
                 emoji = random.choice(ANIMAL_EMOJIS)
-                st.toast(f"{emoji} 课时矩阵+工资统计表格已生成，请下载", icon="✅")
+                st.toast(f"{emoji} 课时矩阵表格已生成，请下载", icon="✅")
 
 # --- 批量导入 ---
-
 elif st.session_state['menu_choice'] == "导入":
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     f = st.file_uploader("上传 CSV", type="csv")
     if f:
         df = pd.read_csv(f); bar = st.progress(0)
@@ -627,17 +660,20 @@ elif st.session_state['menu_choice'] == "导入":
             time.sleep(1.2); st.rerun()
 
 # ====================== 新增：单词带背流程页面 ======================
-
 elif st.session_state['menu_choice'] == "wordflow":
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('<div class="back-btn-box">', unsafe_allow_html=True)
     if st.button("🏠 返回主菜单"): back_home()
-    st.markdown('', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
     st.header("📖 单词训练带背完整流程")
     st.markdown("> 上课对照流程，可上传原始流程示意图")
+
     upload_img = st.file_uploader("上传单词训练流程照片", type=["png","jpg","jpeg"])
     if upload_img is not None:
         st.image(upload_img, use_container_width=True)
+
     st.divider()
+
     st.subheader("一、跟读带读环节")
     st.markdown("""
 1. 教练正常速度带读1遍英文，学生跟读1遍英文
@@ -645,33 +681,42 @@ elif st.session_state['menu_choice'] == "wordflow":
 3. 教练带读1遍英文(同时点击空白显示中文)，学生跟读英+中；快速带读2英+1中，学生跟读2英+1中
 4. 教练读英文，用手挡住英文，学生说出1遍英文+1遍中文
 """)
+
     st.subheader("二、上去下来学新｜向上复习旧单词，往下学习新单词")
     st.markdown("""
-> 以1组5个单词为示例：
-> **学1→学2→复1、2→学3→复2、1、2、3→学4→复3、2、1、2、3、4→学5**
+>以1组5个单词为示例：
+**学1→学2→复1、2→学3→复2、1、2、3→学4→复3、2、1、2、3、4→学5**
 """)
+
     st.subheader("三、五上三下二上（学到第5个单词的复习逻辑）")
     st.markdown("**54345，212**：从第五个往上复习到第三个单词，再下回到第五个单词；再从第二个单词往上复习，再回到第二个")
+
     st.subheader("四、总复习（1‑5，5‑1）")
     st.markdown("能多快有多快；教练点击单词空白带读英文，学生说出英文+中文")
+
     st.subheader("五、听音识单词（1‑5，5‑1）")
     st.markdown("学生闭上眼睛，播放单词发音，学生说出英文和中文，**教练不带读**")
+
     st.subheader("六、模拟剪纸条（2分钟完成，动作流畅快速）")
     st.markdown("""
 学生说出一两个字的时候，就准备下一个单词，加快衔接速度。
-📝备注：遇到学生不熟悉的单词：教练带读2遍英文 +1遍中文，同时点击空白显示中文
-🔁循环规则
 
+>📝备注：遇到学生不熟悉的单词：教练带读2遍英文 +1遍中文，同时点击空白显示中文
+
+🔁循环规则
 - **组内循环**：5个单词为一组，本组全部学完，单词剪给学生
 - **组组循环**：学完第2组，第1+2组合并；学完第3组，1+2+3组合并
 - **章循环**：9组合计45个单词全部学完，全部混组，一整章单词给到学生
 """)
+
     st.subheader("七、学后检测")
     st.markdown("""
 全部打勾，学生快速说出英文+中文。
 遇到不熟悉、翻译错误单词：点出中文，带读两遍英文一遍中文。
+
 > ⚠️重点：学后检测依旧不熟 = 没有掌握，需要记录后台重新学习。
 """)
+
     st.divider()
     st.subheader("📌课堂反馈评语（直接复制）")
     c1,c2 = st.columns(2)
@@ -681,3 +726,4 @@ elif st.session_state['menu_choice'] == "wordflow":
     with c2:
         st.code("本节课复习反馈良好，已学内容无明显遗忘，维持现有节奏稳步积累。", language=None)
         st.code("部分单词熟练度不足，标记待复习，后续课堂重点复盘巩固。", language=None)
+
