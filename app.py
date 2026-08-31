@@ -418,6 +418,27 @@ elif st.session_state['menu_choice'] == "account":
                             else:
                                 st.toast("❌ 修改失败，请检查网络", icon="❌")
         st.divider()
+        # ==================== 【新增额外统计面板开始】 ====================
+        st.subheader("📊 额外分开统计面板")
+        tab_a, tab_b, tab_c = st.tabs(["💰按单价合并统计","全部课型原始汇总","学生+原始课型明细"])
+        with tab_a:
+            # 单价相同课型合并计算
+            price_group = m_df.groupby("单价").agg({"课时":"sum","小计":"sum"}).reset_index()
+            price_group = price_group.sort_values("单价",ascending=False)
+            st.dataframe(price_group,use_container_width=True,hide_index=True)
+
+        with tab_b:
+            type_total = m_df.groupby("学习内容").agg({"课时":"sum","小计":"sum"}).reset_index()
+            type_total = type_total.sort_values("课时",ascending=False)
+            st.dataframe(type_total,use_container_width=True,hide_index=True)
+
+        with tab_c:
+            stu_type_df = m_df.groupby(["姓名","学习内容"]).agg({"课时":"sum","小计":"sum"}).reset_index()
+            stu_type_df = stu_type_df.sort_values(["姓名","课时"],ascending=[True,False])
+            st.dataframe(stu_type_df,use_container_width=True,hide_index=True,height=320)
+        # ==================== 【新增额外统计面板结束】 ====================
+
+        st.divider()
         st.subheader("↩️ 撤销上一步操作")
         cache_exist = isinstance(st.session_state.get("undo_cache"), dict)
         if cache_exist:
