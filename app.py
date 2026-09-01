@@ -327,15 +327,18 @@ elif st.session_state['menu_choice'] == "account":
         with col_metric_2:
             st.metric("⌛ 本月总课时", f"{m_df['课时'].sum():.1f} h")
 
-        # ===== 新增：按单价合并统计（同单价课型合并求和）=====
+        # ===== 新增：按单价合并统计（同单价课型合并求和，附带课型名称）=====
         st.markdown("**📊 按单价合并统计**")
-        price_group = m_df.groupby("单价").agg({"课时":"sum","小计":"sum"}).reset_index()
-        price_group = price_group.sort_values("单价",ascending=False)
-        price_group.columns = ["单价","总课时","总金额"]
+        price_group = m_df.groupby("单价").agg(
+            总课时=("课时", "sum"),
+            总金额=("小计", "sum"),
+            包含课型=("学习内容", lambda x: "、".join(sorted(set(x.tolist()))))
+        ).reset_index()
+        price_group = price_group.sort_values("单价", ascending=False)
+        price_group = price_group[["单价", "包含课型", "总课时", "总金额"]]
         st.dataframe(price_group, use_container_width=True, hide_index=True)
 
         st.divider()
-
         col_stat, col_log = st.columns([5,5])
         with col_stat:
             st.subheader("📋 学生月度统计")
@@ -355,7 +358,6 @@ elif st.session_state['menu_choice'] == "account":
             if sel_stu != "请选择":
                 detail_df = m_df[m_df["姓名"] == sel_stu].sort_values("日期文字", ascending=False)
                 st.dataframe(detail_df[["日期文字","学习内容","课时","单价","小计"]], use_container_width=True, hide_index=True)
-
         with col_log:
             st.subheader("📜 全部流水记录")
             st.dataframe(m_df[["姓名","日期文字","学习内容","课时","单价","小计"]], use_container_width=True, hide_index=True, height=400)
@@ -406,7 +408,7 @@ elif st.session_state['menu_choice'] == "account":
                         all_rec = fetch_feishu_data(TABLE_ID_RECORDS)
                         dup = False
                         if not all_rec.empty:
-                            all_rec["parse_dt"] = pd.to_datetime(all_rec["学习日期"], unit="ms", errors="coerce").dt.date
+                            all_rec["parse_dt"] = pd.to_datetime(all_rec["学习日期"], unit='ms', errors="coerce").dt.date
                             cond = (all_rec["姓名"] == edit_sel_stu) & (all_rec["parse_dt"] == new_d) & (all_rec["record_id"] != edit_target["record_id"])
                             if all_rec[cond].shape[0]>0:
                                 dup=True
