@@ -7,12 +7,14 @@ import io
 import time
 import random
 from collections import defaultdict
+
 # -------------------------- 1. 核心安全配置 (从 Secrets 读取) --------------------------
 APP_ID = st.secrets["FEISHU_APP_ID"]
 APP_SECRET = st.secrets["FEISHU_APP_SECRET"]
 APP_TOKEN = st.secrets["FEISHU_APP_TOKEN"]
 TABLE_ID_STUDENTS = st.secrets["TABLE_ID_STUDENTS"]
 TABLE_ID_RECORDS = st.secrets["TABLE_ID_RECORDS"]
+
 # 业务规则配置
 REVIEW_DAYS = [1, 2, 3, 5, 7, 9, 12, 14, 17, 21]
 LEARN_CONTENTS = ["单词", "大学单词", "雅思单词", "小学阅读", "初中阅读", "初中语法", "高中阅读", "高中完型", "长难句", "雅思", "托福", "四六级"]
@@ -21,10 +23,14 @@ HOURS_OPTIONS = [float(x)/2 for x in range(1, 21)]
 STATUS_OPTIONS = ["在读/上课", "停课/休假", "结课/毕业", "更换教练"]
 GRADE_OPTIONS = ["未填写", "小学", "初一", "初二", "初三", "高一", "高二", "高三", "大学", "成人"]
 ANIMAL_EMOJIS = ["🐱", "🐶", "🦊", "🐼", "🐨", "🐯", "🐰", "🦆", "🐸", "🦁"]
+
 if 'menu_choice' not in st.session_state:
     st.session_state['menu_choice'] = "首页"
 if "undo_cache" not in st.session_state:
     st.session_state["undo_cache"] = None
+if "ai_english_answer" not in st.session_state:
+    st.session_state["ai_english_answer"] = ""
+
 # -------------------------- 2. 核心工具函数 --------------------------
 def get_tenant_access_token():
     url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
@@ -34,6 +40,7 @@ def get_tenant_access_token():
     except Exception as e:
         print(f"获取token失败:{e}")
         return None
+
 def fetch_feishu_data(table_id):
     token = get_tenant_access_token()
     if not token:
@@ -54,6 +61,7 @@ def fetch_feishu_data(table_id):
     except Exception as e:
         print(f"拉取数据异常:{e}")
         return pd.DataFrame()
+
 def add_feishu_record(table_id, fields):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records"
@@ -69,6 +77,7 @@ def add_feishu_record(table_id, fields):
     except Exception as e:
         print(f"新增记录异常:{e}")
         return {"code": -1}
+
 def update_feishu_record(table_id, record_id, fields):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records/{record_id}"
@@ -78,6 +87,7 @@ def update_feishu_record(table_id, record_id, fields):
         return r.json()
     except:
         return {"code": -1}
+
 def delete_feishu_record(table_id, record_id):
     token = get_tenant_access_token()
     url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{APP_TOKEN}/tables/{table_id}/records/{record_id}"
@@ -90,6 +100,7 @@ def delete_feishu_record(table_id, record_id):
     except Exception as e:
         print(f"删除异常:{e}")
         return {"code":-1}
+
 # ========= 单价逻辑 =========
 def get_unit_price(content):
     """
@@ -116,6 +127,7 @@ def generate_wechat_msg(name, review_date, learn_dates):
     sorted_ln = sorted(list(set(learn_dates)))
     ln_dates_str = "\n".join([datetime.datetime.strptime(d, "%Y-%m-%d").strftime("%m月%d日单词学习内容") for d in sorted_ln])
     return f"【21天抗遗忘单词复习提醒】\n\n{rv_date_str}复习内容为：\n\n{ln_dates_str}\n\n请{name}同学抽出时间复习 巩固单词印象 加油哦💪期待下次的课堂哦"
+
 def execute_undo():
     cache = st.session_state.get("undo_cache")
     if not (isinstance(cache, dict) and "action" in cache):
@@ -144,6 +156,73 @@ def execute_undo():
         else:
             return False, f"恢复新增失败:{res}"
     return False, "未知操作类型"
+
+# ========= 免费英语教学 AI 接口调用 =========
+def call_english_teaching_ai(system_prompt, user_prompt):
+    """
+    默认免 Key 自动切换免费通道（Kilo Free Gateway / LLM7 Free API）；
+    如在 Secrets 配置了 AI_API_KEY / AI_BASE_URL / AI_MODEL，也会优先尝试。
+    """
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    endpoints = []
+    try:
+        custom_key = st.secrets.get("AI_API_KEY", "")
+        custom_url = st.secrets.get("AI_BASE_URL", "")
+        custom_model = st.secrets.get("AI_MODEL", "glm-4-flash")
+        if custom_key and custom_url:
+            endpoints.append({
+                "name": "Secrets自定义接口",
+                "url": custom_url,
+                "model": custom_model,
+                "key": custom_key,
+            })
+    except Exception:
+        pass
+
+    endpoints.extend([
+        {
+            "name": "Kilo Free Gateway",
+            "url": "https://api.kilo.ai/api/gateway/chat/completions",
+            "model": "kilo-auto/free",
+            "key": "",
+        },
+        {
+            "name": "LLM7 Free API",
+            "url": "https://api.llm7.io/v1/chat/completions",
+            "model": "gpt-3.5-turbo",
+            "key": "",
+        },
+    ])
+
+    errors = []
+    for ep in endpoints:
+        headers = {"Content-Type": "application/json"}
+        if ep["key"]:
+            headers["Authorization"] = f"Bearer {ep['key']}"
+        payload = {
+            "model": ep["model"],
+            "messages": messages,
+            "temperature": 0.7,
+        }
+        try:
+            resp = requests.post(ep["url"], headers=headers, json=payload, timeout=30)
+            if resp.status_code == 200:
+                data = resp.json()
+                choices = data.get("choices", [])
+                if choices and choices[0].get("message", {}).get("content"):
+                    return True, choices[0]["message"]["content"].strip(), ep["name"]
+                errors.append(f"{ep['name']}: 返回格式异常")
+            else:
+                errors.append(f"{ep['name']} (HTTP {resp.status_code})")
+        except Exception as e:
+            errors.append(f"{ep['name']}: {str(e)}")
+
+    return False, "免费AI通道暂时繁忙，请稍后再试。\n详情：" + "；".join(errors), None
+
 # -------------------------- 3. 全局页面样式 --------------------------
 st.set_page_config(page_title="FishTeacher", layout="wide", page_icon="🐟")
 st.markdown("""
@@ -257,12 +336,15 @@ div[data-testid="stDataFrame"] td {
 }
 </style>
 """, unsafe_allow_html=True)
+
 # 修正：去除重复标题，只保留一套
 st.markdown('<p class="brand-title">🐟 FishTeacher</p>', unsafe_allow_html=True)
 st.markdown('<p class="brand-desc">掌上拇指便捷管理</p>', unsafe_allow_html=True)
+
 def back_home():
     st.session_state['menu_choice'] = "首页"
     st.rerun()
+
 # --- 首页菜单 ---
 if st.session_state['menu_choice'] == "首页":
     st.markdown("# 🐟 FishTeacher")
@@ -272,11 +354,13 @@ if st.session_state['menu_choice'] == "首页":
         if st.button("🔍 复习提醒"): st.session_state['menu_choice'] = "提醒"; st.rerun()
         if st.button("📊 账目&明细"): st.session_state['menu_choice'] = "account"; st.rerun()
         if st.button("👥 学生档案"): st.session_state['menu_choice'] = "名册"; st.rerun()
+        if st.button("🗣️ 课堂英语话术"): st.session_state['menu_choice'] = "english_talk"; st.rerun()
     with col2:
         if st.button("📝 快速录课"): st.session_state['menu_choice'] = "录入"; st.rerun()
         if st.button("📄 导出21天"): st.session_state['menu_choice'] = "导出"; st.rerun()
         if st.button("📥 批量数据导入"): st.session_state['menu_choice'] = "导入"; st.rerun()
         if st.button("📖单词带背流程"): st.session_state['menu_choice'] = "wordflow"; st.rerun()
+
 # --- 复习提醒模块 ---
 elif st.session_state['menu_choice'] == "提醒":
     if st.button("🏠 返回主菜单"): back_home()
@@ -304,6 +388,7 @@ elif st.session_state['menu_choice'] == "提醒":
                     st.code(generate_wechat_msg(name, q_date, dates), language=None)
         else:
             st.info("今日该学生无复习任务")
+
 # --- 账目&明细 ---
 elif st.session_state['menu_choice'] == "account":
     if st.button("🏠 返回主菜单"): back_home()
@@ -546,6 +631,7 @@ elif st.session_state['menu_choice'] == "录入":
             delete_feishu_record(TABLE_ID_RECORDS, target_row_del["record_id"])
             st.toast("🗑️ 记录已删除，前往账目页面执行撤销恢复", icon="⚠️")
             time.sleep(1); st.rerun()
+
 # --- 学生档案 ---
 elif st.session_state['menu_choice'] == "名册":
     if st.button("🏠 返回主菜单"): back_home()
@@ -615,6 +701,7 @@ elif st.session_state['menu_choice'] == "名册":
             st.toast(f"❌ {msg}", icon="❌")
         st.session_state["undo_cache"] = None
         time.sleep(0.8); st.rerun()
+
 # --- 导出21天表 + 本月课时表格 ---
 elif st.session_state['menu_choice'] == "导出":
     if st.button("🏠 返回主菜单"): back_home()
@@ -696,6 +783,7 @@ elif st.session_state['menu_choice'] == "导出":
                 st.download_button(f"📥 下载 {filename}", buf2.getvalue().encode("utf-8-sig"), filename, "text/csv")
                 emoji = random.choice(ANIMAL_EMOJIS)
                 st.toast(f"{emoji} 课时矩阵表格已生成，请下载", icon="✅")
+
 # --- 批量导入 ---
 elif st.session_state['menu_choice'] == "导入":
     if st.button("🏠 返回主菜单"): back_home()
@@ -723,6 +811,7 @@ elif st.session_state['menu_choice'] == "导入":
             emoji = random.choice(ANIMAL_EMOJIS)
             st.toast(f"{emoji} 批量导入完成", icon="✅")
             time.sleep(1.2); st.rerun()
+
 # ====================== 单词带背流程页面 ======================
 elif st.session_state['menu_choice'] == "wordflow":
     if st.button("🏠 返回主菜单"): back_home()
@@ -773,3 +862,117 @@ elif st.session_state['menu_choice'] == "wordflow":
     with c2:
         st.code("本节课复习反馈良好，已学内容无明显遗忘，维持现有节奏稳步积累。", language=None)
         st.code("部分单词熟练度不足，标记待复习，后续课堂重点复盘巩固。", language=None)
+
+# ====================== 课堂英语话术 + 免费英语教学 AI 助手 ======================
+elif st.session_state['menu_choice'] == "english_talk":
+    if st.button("🏠 返回主菜单"): back_home()
+    st.header("🗣️ 课堂英语话术")
+    st.markdown("### 英语课堂口语小抄（中英对照｜直接复制）")
+    st.markdown("""
+## 一、课程开场 & 流程指令
+
+1. Class begins. 上课。
+2. Let’s start our review! 开始复习罗！
+3. Now let’s learn something new. 现在进入学新。
+4. Try it on your own. 自己来一遍。
+5. Sorry, I clicked the wrong option. 不好意思，我点错了选项。
+6. Let’s have a pre-class check. 学前检测一下。
+7. Let’s have a post-class check. 学后检测一下。
+8. Today is a review class. 今天是复习课。
+9. Class is over. 下课。
+10. Let’s begin our class. 我们开始上课。
+
+## 二、控场引导
+
+1. It’s your turn. 轮到你了。
+2. Read it again. 再读一遍。
+3. Take your time. 别急，慢慢来。
+4. Listen carefully. 仔细听。
+5. Read after me. 跟着我读。
+6. Speak louder. 大声一点。
+7. Look here. 看这里。
+8. Are you ready? 准备好了吗？
+9. Pause for a second. 停一下。
+10. Let’s do it together. 我们一起。
+11. Who wants to have a try? 谁想来试试？
+12. You may sit down. 可以坐下了。
+
+## 三、切换小组 / 切换板块
+
+1. Good reading! Next group. 读得不错，我们下一组。
+2. Nice job! Let’s move on to the next group. 很棒！我们换到下一组。
+3. Well done! Next group, please. 做得很好，请下一组。
+4. Let’s quickly move on to the next part. 让我们快速进入下一部分学习。
+5. Let’s quickly go to the next group. 我们快速来到下一组（学生小组）。
+
+## 四、夸奖｜读得不错（轮换用）
+
+1. Good reading! 读得很好！
+2. Nice pronunciation. 发音不错。
+3. That sounds great. 听起来很棒。
+4. You read it smoothly. 你读得很流畅。
+5. Perfect! 非常好！
+6. Excellent! 太棒啦！
+7. Nice work! 做得很好。
+8. I love your reading. 我很喜欢你的朗读。
+9. That’s close. 差不多了。
+
+## 五、安慰、重试、跳过延后复习
+
+1. It’s okay. Let’s read it a few more times. 没事的，我们再多念几遍。
+2. Don’t worry. We can practise it again. 别担心，我们可以再练练。
+3. No problem. Let’s try once more slowly. 没关系，我们慢一点再来一次。
+4. Just take it easy. 放轻松就好。
+5. It’s fine to make mistakes. 犯错没关系。
+6. Mistakes help us learn. 错误帮助我们学习。
+7. Let’s skip this one for now. We’ll review it later. 我们先跳过这个，之后再来复习。
+8. We can leave this here. We will go over it after class. 先放一放，课下我们再复习。
+9. Don’t worry, we will come back to this next time. 不用担心，下次我们回头再学这个。
+10. Try again. 再试一次。
+
+## 六、配套话题句（口语问答）
+
+1. meet sb 和某人见面 / 见一面
+2. meet up with sb （约好）和某人碰面
+3. I want to meet her. 我想和她见一面。
+4. I’ll meet up with my friend. 我要和朋友见一面。
+5. I need to see him. 我要跟他见一面。
+6. Looking forward to seeing you. 期待见到你（认识的人）。
+7. Looking forward to meeting you. 期待和你见面（初次）。
+8. Can’t wait to see you. 迫不及待想见你。
+9. I’m looking forward to our meeting. 我期待我们见面。
+10. What are your hobbies? 你的爱好是什么？
+11. And my hobbies are writing, listening to music, painting and photography, mostly!!  
+    我的爱好主要是写作、听音乐、画画还有摄影！
+12. Who do you want to meet up with this weekend?  
+    这周末你想和谁见一面？
+""")
+
+    st.divider()
+    st.subheader("🤖 英语教学 AI 助手")
+    with st.form("english_ai_mini"):
+        ai_q = st.text_input(
+            "输入教学要求",
+            placeholder="例如：给初二学生讲解 abandon 的记忆法和2个例句 / 学生走神怎么用英语提醒",
+        )
+        ai_go = st.form_submit_button("✨ 生成答案")
+
+    if ai_go:
+        if not ai_q.strip():
+            st.toast("⚠️ 请输入要求", icon="⚠️")
+        else:
+            sys_prompt = (
+                "你是一位专业的中国英语教学教练AI助手，擅长21天抗遗忘单词带背、中小学及大学英语教学。"
+                "请根据老师输入的教学要求，直接给出简洁、实用、可直接用于课堂或发给学生/家长的答案"
+                "（如单词助记与例句、中英课堂话术、通俗语法拆解、学情反馈等），不要废话，排版精简清晰。"
+            )
+            with st.spinner("🤖 生成中..."):
+                ok, ans, _ = call_english_teaching_ai(sys_prompt, ai_q.strip())
+            if ok:
+                st.session_state["ai_english_answer"] = ans
+            else:
+                st.error(ans)
+
+    if st.session_state.get("ai_english_answer"):
+        with st.container(border=True):
+            st.markdown(st.session_state["ai_english_answer"])
